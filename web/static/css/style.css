@@ -1,0 +1,421 @@
+/* ============================================================
+   FTIR Web App — Stylesheet
+   ============================================================ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    background: #f5f7fa;
+    color: #333;
+    line-height: 1.5;
+}
+
+/* --- Layout --- */
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    padding: 30px 0 20px;
+    border-bottom: 2px solid #2c5f8a;
+    margin-bottom: 30px;
+}
+header { position: relative; }
+header h1 { font-size: 1.8em; color: #2c5f8a; }
+header p { color: #666; margin-top: 5px; }
+
+/* --- Changelog button & panel --- */
+.btn-changelog {
+    position: absolute;
+    top: 30px;
+    right: 0;
+    padding: 5px 14px;
+    background: #fff;
+    color: #2c5f8a;
+    border: 1px solid #2c5f8a;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-changelog:hover { background: #2c5f8a; color: #fff; }
+
+.changelog-panel {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+.changelog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: #f0f4f8;
+    border-bottom: 1px solid #ddd;
+}
+.changelog-header h2 {
+    font-size: 1.05em;
+    color: #2c5f8a;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1.4em;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+}
+.btn-close:hover { color: #333; }
+
+.changelog-body {
+    padding: 16px 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 0.9em;
+    line-height: 1.7;
+}
+.changelog-body .log-entry {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #eee;
+}
+.changelog-body .log-entry:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+.changelog-body .log-date {
+    font-weight: 700;
+    color: #2c5f8a;
+    font-size: 0.95em;
+}
+.changelog-body .log-items {
+    margin: 4px 0 0 18px;
+    padding: 0;
+}
+.changelog-body .log-items li {
+    margin-bottom: 2px;
+    color: #444;
+}
+
+/* --- Form sections --- */
+.form-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.form-section h2 {
+    font-size: 1.1em;
+    color: #2c5f8a;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+/* --- File upload --- */
+.file-input-wrapper {
+    margin-bottom: 12px;
+}
+.file-input-wrapper label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.file-input-wrapper .hint {
+    font-size: 0.85em;
+    color: #888;
+}
+input[type="file"] {
+    display: block;
+    margin-top: 4px;
+    padding: 6px;
+    border: 1px dashed #bbb;
+    border-radius: 4px;
+    width: 100%;
+    background: #fafafa;
+}
+
+/* --- Composition grid --- */
+.comp-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.comp-item label {
+    display: block;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 2px;
+}
+.comp-item input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.95em;
+}
+
+/* --- Inline field rows --- */
+.field-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.field-row label {
+    font-weight: 600;
+    min-width: 140px;
+    font-size: 0.9em;
+}
+.field-row input, .field-row select {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.95em;
+}
+.field-row select { min-width: 180px; }
+.field-row input[type="number"] { width: 120px; }
+
+/* --- Thickness mode panels --- */
+.mode-panel { display: none; margin-top: 12px; }
+.mode-panel.active { display: block; }
+
+/* --- Fringe table (Mode A) --- */
+.fringe-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+}
+.fringe-table th, .fringe-table td {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    text-align: center;
+}
+.fringe-table th {
+    background: #f0f4f8;
+    font-size: 0.85em;
+}
+.fringe-table input {
+    width: 80px;
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    text-align: center;
+}
+.btn-sm {
+    padding: 4px 10px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+.btn-add { background: #2c5f8a; color: #fff; }
+.btn-remove { background: #dc3545; color: #fff; }
+
+/* --- Advanced parameters (collapsible) --- */
+details {
+    margin-top: 10px;
+}
+details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #2c5f8a;
+    padding: 6px 0;
+}
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+.checkbox-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+/* --- Submit button --- */
+.submit-row {
+    text-align: center;
+    margin: 24px 0;
+}
+.btn-submit {
+    padding: 12px 48px;
+    background: #2c5f8a;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-submit:hover { background: #1e4468; }
+.btn-submit:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+}
+
+/* --- Status / spinner --- */
+#status {
+    text-align: center;
+    padding: 12px;
+    margin-bottom: 20px;
+    display: none;
+}
+#status.loading {
+    display: block;
+    color: #2c5f8a;
+    font-weight: 600;
+}
+#status.error {
+    display: block;
+    background: #fdecea;
+    color: #c0392b;
+    border: 1px solid #e74c3c;
+    border-radius: 6px;
+}
+.spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 3px solid #ddd;
+    border-top-color: #2c5f8a;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- Results --- */
+#results-section { display: none; }
+#results-section.visible { display: block; }
+
+.result-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.result-card h2 {
+    font-size: 1.1em;
+    color: #2c5f8a;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Result tables */
+.result-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.result-table th, .result-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+.result-table th {
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9em;
+    width: 40%;
+}
+.result-table td {
+    font-family: "Consolas", "Courier New", monospace;
+}
+.result-table tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+/* Figures */
+.figures-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+.figure-wrapper {
+    text-align: center;
+}
+.figure-wrapper h3 {
+    font-size: 0.95em;
+    color: #555;
+    margin-bottom: 8px;
+}
+.figure-wrapper img {
+    max-width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* --- Mode toggle (Single / Batch) --- */
+.mode-toggle-row {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 20px;
+}
+.btn-mode {
+    padding: 10px 32px;
+    background: #fff;
+    color: #2c5f8a;
+    border: 2px solid #2c5f8a;
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-mode:first-child { border-radius: 6px 0 0 6px; }
+.btn-mode:last-child { border-radius: 0 6px 6px 0; }
+.btn-mode.active {
+    background: #2c5f8a;
+    color: #fff;
+}
+.btn-mode:hover:not(.active) { background: #e8eef4; }
+
+/* --- Download buttons --- */
+.download-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin: 24px 0;
+}
+.btn-download {
+    padding: 10px 28px;
+    background: #27ae60;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-download:hover { background: #1e8449; }
+.btn-download-fig { background: #2c5f8a; }
+.btn-download-fig:hover { background: #1e4468; }
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+    .comp-grid { grid-template-columns: repeat(3, 1fr); }
+    .field-row { flex-direction: column; align-items: flex-start; }
+    .field-row label { min-width: auto; }
+}

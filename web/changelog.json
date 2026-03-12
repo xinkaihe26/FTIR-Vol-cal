@@ -1,0 +1,27 @@
+[
+     {
+        "date": "2026-03-11",
+        "items": [
+            "Added batch file fitting options",
+            "Update fitting results output"
+            ]
+    },
+    {
+        "date": "2026-03-10",
+        "items": [
+            "Added fringe correction option (Auto / Off / Always) for CO3 fitting",
+            "Added changelog panel to web interface",
+            "Residual plot title changed from 'Residuals - SS(E)' to 'Fit - Data'"
+        ]
+    },
+    {
+        "date": "2026-03-09",
+        "items": [
+            "Web interface launched (Flask)",
+            "Three CO3 fitting models: (A) lstsq, (B) lstsq with shifted CO2 doublet peak position, (C) PCA+Shifted position",
+            "Three thickness modes: (A) Manual fringes, (B) Direct value input, (C) Auto reflectance",
+            "Composition-dependent absorptivities (Shi et al. 2024)",
+            "YAML/JSON config file support"
+        ]
+    }
+]

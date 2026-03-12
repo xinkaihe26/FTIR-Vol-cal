@@ -1,0 +1,79 @@
+# =============================================================================
+# FTIR Sample Configuration Template / FTIR 样品配置模板
+# =============================================================================
+#
+# How to use / 使用方法:
+#   1. Copy this file to your project folder
+#   2. Fill in your sample information
+#   3. Run:  python ftir_tools.py your_config.yaml
+#   Or run all configs in a folder:  python ftir_tools.py your_folder/
+#
+# Recommended folder structure / 推荐文件夹结构:
+#   my_project/
+#     spectra/
+#       sample-01-trans.txt
+#       sample-01-ref.txt
+#     sample-01.yaml          <-- this config file
+#     sample-02.yaml
+#
+# Lines starting with # are comments. Remove # to activate a parameter.
+# 以 # 开头的行是注释。删除 # 以激活参数。
+# =============================================================================
+
+# Sample name (optional, defaults to spectrum filename stem)
+# 样品名称（可选，默认使用光谱文件名）
+# sample_name: my-sample-01
+
+# ---- 1. Transmission spectrum (REQUIRED) ----
+# ---- 1. 透射光谱文件（必须）----
+# Path can be absolute or relative to this config file's location.
+# 路径可以是绝对路径，或相对于本配置文件的路径。
+spectrum: spectra/sample-01-trans.txt
+
+# ---- 2. Glass composition in wt% (REQUIRED) ----
+# ---- 2. 玻璃氧化物组分 wt%（必须）----
+# Use "FeOT" for total iron, or separate "Fe2O3" and "FeO".
+# 使用 "FeOT" 表示全铁，或分别填写 "Fe2O3" 和 "FeO"。
+composition:
+  SiO2: 49.2
+  TiO2: 3.18
+  Al2O3: 12.82
+  FeOT: 14.41
+  MnO: 0.22
+  MgO: 5.64
+  CaO: 9.37
+  Na2O: 3.22
+  K2O: 0.84
+
+# ---- 3. Thickness (REQUIRED — choose ONE mode) ----
+# ---- 3. 厚度（必须 - 三选一）----
+
+# Mode A: Manual fringe measurements / 模式A: 手动条纹测量
+#   Each entry: [wavenumber_high, wavenumber_low, num_fringes]
+#   每项: [高波数, 低波数, 条纹数]
+# thickness_measurements:
+#   - [2395, 2022, 4]
+#   - [2489, 2207, 3]
+#   - [2674, 2395, 3]
+
+# Mode B: Direct thickness value / 模式B: 直接输入厚度值 (um)
+# thickness_um: 27.4
+# thickness_unc_um: 0.5
+
+# Mode C: Auto-detect from reflectance spectrum / 模式C: 反射光谱自动测厚
+#   Provide both reflectance_csv and olivine_fo.
+#   需要同时提供反射光谱路径和橄榄石 Fo 值。
+# reflectance_csv: spectra/sample-01-ref.txt
+# olivine_fo: 85
+
+# ---- 4. Optional parameters / 可选参数 ----
+# fe3_ratio: 0.15                    # Fe3+/Fe_total (default: 0.15)
+# co3_model: fixed                   # fixed / taylor / pca_shift (default: fixed)
+# use_composition_epsilon: false     # true = Shi et al. (2024) composition-dependent epsilon
+# epsilon_oh: 62.3                   # OH molar absorptivity (ignored if use_composition_epsilon)
+# epsilon_h2omol: 25.0               # H2Omol molar absorptivity
+# epsilon_co3: 375.0                 # CO3 molar absorptivity
+
+# ---- 5. Output options / 输出选项 ----
+# save_figures: true                 # Save diagnostic plots (default: true)
+# output_dir: results/               # Output directory (default: same as spectrum)

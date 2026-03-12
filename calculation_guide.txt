@@ -1,0 +1,545 @@
+================================================================================
+   FTIR Dissolved Volatile Analysis: Calculation Logic and Algorithm Guide
+================================================================================
+
+Authors: FTIR Data Processing Project
+Purpose: Reference document for users and reviewers
+
+
+TABLE OF CONTENTS
+-----------------
+  1. Overview
+  2. Step 1 — Sample Thickness from Reflectance Fringes
+  3. Step 2 — Glass Density and Refractive Index
+  4. Step 3 — H2O Peak Analysis (O-H Stretch, ~3550 cm-1)
+  5. Step 4 — CO3 Carbonate Doublet Fitting (~1430/1515 cm-1)
+     5.1 Spectrum Normalization
+     5.2 Fixed Reference Model (model="fixed")
+     5.3 PCA + Peak Shift Model (model="pca_shift")
+     5.4 Quality Flags
+     5.5 CO3 Uncertainty Estimation
+  6. Step 5 — Concentration Calculations (Beer-Lambert Law)
+     6.1 Total H2O (wt%) from O-H Stretch
+     6.2 Molecular H2O (wt%) from 1630 cm-1
+     6.3 CO2 (ppm) from CO3 Doublet
+     6.4 Uncertainty Propagation
+  7. Default Physical Constants
+  8. Input Data Format
+  9. References
+
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+This toolkit calculates dissolved H2O (wt%) and CO2 (ppm) concentrations
+in volcanic glass samples from FTIR (Fourier Transform Infrared) transmission
+spectra. The analysis pipeline consists of five sequential steps:
+
+  Input:   Transmission spectrum (wavenumber vs. absorbance)
+           Reflectance spectrum (for thickness measurement)
+           Glass oxide composition (wt%)
+
+  Step 1:  Measure sample thickness from reflectance interference fringes
+  Step 2:  Calculate glass density and refractive index from composition
+  Step 3:  Baseline-correct the O-H stretch peak (~3550 cm-1) -> A_OH
+  Step 4:  Fit the CO3 carbonate doublet (~1430/1515 cm-1) -> A_CO3
+  Step 5:  Apply Beer-Lambert law to convert absorbance -> concentration
+
+  Output:  Total H2O (wt%), Molecular H2O (wt%), CO2 (ppm)
+           Uncertainty estimates for each
+
+
+================================================================================
+2. STEP 1 — SAMPLE THICKNESS FROM REFLECTANCE FRINGES
+================================================================================
+
+2.1 Physical Basis
+------------------
+Doubly-polished glass wafers act as thin-film interferometers. When
+illuminated with broadband IR light, constructive and destructive
+interference produces oscillating fringes in the reflectance spectrum.
+The fringe spacing is directly related to the sample thickness.
+
+2.2 Formula
+-----------
+                      N
+  thickness (um) = --------- x 10000
+                   2 n (v2-v1)
+
+Where:
+  N     = number of complete interference fringes counted between v1 and v2
+  n     = refractive index of the glass
+  v2    = higher wavenumber bound (cm-1)
+  v1    = lower wavenumber bound (cm-1)
+  10000 = conversion factor from cm to um
+
+2.3 Multiple Measurements
+-------------------------
+Multiple fringe-counting regions are measured per sample to reduce
+counting errors. The final thickness is:
+
+  d     = mean(d_1, d_2, ..., d_k)
+  sigma_d = stdev(d_1, d_2, ..., d_k)
+
+The standard deviation sigma_d serves as the thickness uncertainty and
+propagates into the final H2O concentration uncertainty.
+
+2.4 Practical Notes
+-------------------
+- Count fringes in regions free of absorption bands (typically 1500-3000 cm-1)
+- The refractive index can be measured independently or calculated from
+  composition (Step 2)
+- Typical glass thicknesses: 15-100 um for FTIR analysis
+
+
+================================================================================
+3. STEP 2 — GLASS DENSITY AND REFRACTIVE INDEX
+================================================================================
+
+3.1 Density Calculation
+-----------------------
+Glass density is calculated from oxide composition using partial molar
+volumes (Lange, 1999; Luhr, 2001):
+
+  density (g/cm3) = GFW / V_molar
+
+Where:
+  GFW     = sum(Xi * MWi)       [gram formula weight]
+  V_molar = sum(Xi * Vi_bar)    [molar volume, cm3/mol]
+  Xi      = mole fraction of oxide i
+  MWi     = molecular weight of oxide i (g/mol)
+  Vi_bar  = partial molar volume of oxide i at 25C, 1 bar (cm3/mol)
+
+Step-by-step:
+  (1) Convert wt% to moles:       moles_i = wt%_i / MW_i
+  (2) Calculate mole fractions:    Xi = moles_i / sum(moles_j)
+  (3) Calculate molar volume:      V_molar = sum(Xi * Vi_bar)
+  (4) Calculate gram formula wt:   GFW = sum(Xi * MWi)
+  (5) Density = GFW / V_molar
+
+Partial Molar Volumes (cm3/mol):
+  SiO2:  27.01        TiO2:  13.205       Al2O3: 37.76
+  Fe2O3: 29.63        FeO:   10.50        MgO:    8.81
+  CaO:   13.03        Na2O:  19.88        K2O:   33.63
+  H2O:   13.93
+
+Iron Splitting: If total iron is given as FeOT (wt% FeO), it is split:
+  Fe2O3 = FeOT * R * (MW_Fe2O3 / (2 * MW_FeO))
+  FeO   = FeOT * (1 - R)
+  where R = Fe3+/Fe_total (default 0.15)
+
+3.2 Refractive Index
+--------------------
+Calculated using Church & Johnson (1980):
+
+  n = 1 + sum(wf_i * ci)
+
+Where:
+  wf_i = weight fraction of oxide i (= wt%_i / 100)
+  ci   = empirical coefficient for oxide i
+
+Coefficients for (n-1):
+  SiO2:  0.460        TiO2:  1.158        Al2O3: 0.581
+  Fe2O3: 1.090        FeO:   0.897        MgO:   0.903
+  CaO:   0.795        Na2O:  0.505        K2O:   0.495
+
+
+================================================================================
+4. STEP 3 — H2O PEAK ANALYSIS (O-H STRETCH, ~3550 cm-1)
+================================================================================
+
+4.1 Baseline Correction
+-----------------------
+The O-H stretching vibration produces a broad absorption peak near
+3550 cm-1. To measure its height, a linear baseline is fitted through
+two anchor regions that are free of absorption features:
+
+  Low anchor:  2200-2400 cm-1 (flat, absorption-free region)
+  High anchor: 3700-3800 cm-1 (above the O-H peak)
+
+At each anchor region, the mean wavenumber and mean absorbance of all
+data points define the anchor point:
+
+  (wn_lo, abs_lo) = mean of all points in [2200, 2400] cm-1
+  (wn_hi, abs_hi) = mean of all points in [3700, 3800] cm-1
+
+The linear baseline:
+  baseline(v) = slope * v + intercept
+  slope     = (abs_hi - abs_lo) / (wn_hi - wn_lo)
+  intercept = abs_lo - slope * wn_lo
+
+Baseline-corrected absorbance:
+  A_corrected(v) = A_raw(v) - baseline(v)
+
+4.2 Peak Height Measurement
+----------------------------
+The peak height A_OH is read at a fixed wavenumber of 3550 cm-1
+(linearly interpolated between adjacent data points), rather than
+at the maximum of the corrected spectrum. This provides a consistent,
+composition-independent measurement point.
+
+4.3 Baseline Uncertainty
+-------------------------
+The low-anchor region (2200-2400 cm-1, width ~200 cm-1) is divided into
+overlapping sub-windows of ~67 cm-1 width with 50% overlap. Each
+sub-window defines a different low-anchor point, producing a different
+baseline and a different peak height.
+
+  sigma_A = stdev(A_1, A_2, ..., A_m)
+
+where A_i is the peak height from the i-th sub-window baseline. This
+captures the sensitivity of the measurement to the exact position of
+the baseline anchor within the absorption-free region.
+
+
+================================================================================
+5. STEP 4 — CO3 CARBONATE DOUBLET FITTING
+================================================================================
+
+5.1 Overview
+------------
+Dissolved CO2 in silicate glass exists primarily as carbonate (CO3^2-),
+which produces a characteristic doublet absorption at approximately
+1430 cm-1 and 1515 cm-1. This doublet is superimposed on:
+  - Glass background absorption (Si-O vibrations)
+  - Molecular H2O bending mode (~1630 cm-1)
+
+To extract the CO3 signal, the spectrum is decomposed into known
+reference components using least-squares fitting.
+
+Two models are available:
+  (a) "fixed"     — matches Excel CO2_bestfit.xls (standard method)
+  (b) "pca_shift" — PCA baseline + independent peak shift (advanced)
+
+5.2 Spectrum Normalization
+--------------------------
+Before fitting, the transmission spectrum is normalized to an equivalent
+100 um thickness:
+
+  A_norm(v) = A_raw(v) * (100 / d_um)
+
+This is critical: all fitted coefficients correspond to a 100 um path
+length. The concentration formulas in Step 5 account for this by using
+100 (not the actual thickness) in the denominator.
+
+This normalization originates from the Excel CO2_bestfit.xls template:
+  Column B (fitted) = normalized spectrum
+  Column D (raw)    = measured spectrum
+  B / D = 100 / d_um (constant for each sample)
+
+5.3 Fixed Reference Model (model="fixed")
+------------------------------------------
+Fitting range: 1350-1800 cm-1 (116 points on reference grid)
+
+The normalized spectrum is decomposed as:
+
+  y(v) = c0 + c1*E(v) + c2*F(v) + c3*G(v) + c4*H(v)
+
+Where:
+  c0     = constant offset
+  c1     = background amplitude
+  c2     = H2O molecular bending mode amplitude (at 1630 cm-1)
+  c3     = CO3 doublet amplitude (THE KEY OUTPUT for CO2)
+  c4     = linear slope correction
+
+  E(v) = background reference spectrum
+         (devolatilized glass WOK162DV.US3, 259 points)
+  F(v) = 1630 cm-1 H2O bending mode reference
+         (normalized, peak = 1 at 1635 cm-1)
+  G(v) = CO3 doublet reference spectrum
+         (normalized at 1527 cm-1, peaks at ~1431 and ~1527)
+  H(v) = linear index (1, 2, 3, ..., n_pts)
+
+Solver: numpy.linalg.lstsq (unconstrained linear least squares)
+  - Gives mathematically optimal solution (minimum sum of squared residuals)
+  - Matches Excel CO2_bestfit.xls Solver behavior
+
+Reference spectra (E, F, G) are pre-stored in co2_reference_spectra.json
+(259 data points, 2198-1203 cm-1, ~3.86 cm-1 spacing, extracted from
+CO2_bestfit.xls).
+
+CO3 extraction by subtraction:
+  CO3_band(v) = data(v) - (c0 + c1*E + c2*F + c4*H)
+
+Peak heights are measured at ~1515 cm-1 ([1496, 1532]) and ~1430 cm-1
+([1396, 1451]), and averaged:
+  A_CO3 = (peak_1515 + peak_1430) / 2
+
+Note on multicollinearity: The design matrix has a high condition number
+(~11578) because E_bkg and H_line are 93% correlated. This means different
+coefficient combinations can produce nearly identical fitted curves.
+However, the CO3 coefficient (c3) is the most stable parameter (~4.6%
+variation), because CO3 has a unique spectral shape (doublet) that is
+not replicated by other components.
+
+5.4 PCA + Peak Shift Model (model="pca_shift")
+-----------------------------------------------
+Fitting range: 1250-2200 cm-1 (wider than fixed model)
+
+This model replaces the single reference spectrum E_bkg with PCA
+(Principal Component Analysis) components trained on 57 devolatilized
+glass spectra (basalt-andesite, SiO2 = 43-60%) by Shi et al. (2024,
+PyIRoGlass). This provides a composition-flexible baseline that
+adapts to the sample's actual glass absorption, including the Si-O
+upturn below 1350 cm-1.
+
+Model (14 parameters, solved simultaneously):
+
+  y(v) = [Baseline] + [H2Om] + [CO3] + [Linear]
+
+  Baseline (5 params):
+    a0*B_mean + a1*BPC1 + a2*BPC2 + a3*BPC3 + a4*BPC4
+    - B_mean = mean of 57 devolatilized glass spectra
+    - BPC1-4 = first 4 principal components capturing
+               composition-dependent absorption variations
+
+  H2Om,1635 (3 params):
+    b0*H_mean + b1*HPC1 + b2*HPC2
+    - Empirical molecular H2O bending peak shape + 2 PCs
+    - Better captures peak shape variations across compositions
+      than a single Gaussian or reference spectrum
+
+  CO3 Doublet (4 params):
+    amp_1430 * G_1430(v) + damp_1430 * G_1430'(v)
+    + amp_1515 * G_1515(v) + damp_1515 * G_1515'(v)
+
+    G_xxxx(v) = exp(-(v - mu)^2 / (2*sigma^2))  [Gaussian, sigma=30]
+    G_xxxx'(v) = G(v) * (v - mu) / sigma^2       [Taylor derivative]
+
+    The derivative terms allow each peak to shift independently:
+      shift_1430 = damp_1430 / amp_1430  (cm-1)
+      shift_1515 = damp_1515 / amp_1515  (cm-1)
+
+    If |shift| > 15 cm-1, the result is flagged as SUSPECT — the
+    feature being fitted is likely NOT dissolved CO3 (could be
+    interference fringes, organic contamination, or mineral inclusions).
+
+  Linear (2 params):
+    m * v_normalized + b0   [tilt + offset]
+
+Solver: scipy.optimize.lsq_linear (bounded linear least squares)
+
+Bounds (adapted from PyIRoGlass MCMC bounds):
+  B_mean: [0, 4]          BPC1: [-3, 3]        BPC2: [-2, 2]
+  BPC3: [-0.6, 0.6]       BPC4: [-0.3, 0.3]
+  H2Om: [0, 3]            HPC1: [-2, 2]        HPC2: [-2, 2]
+  CO3 amplitudes: [0, inf]    CO3 derivatives: [-inf, inf]
+  Tilt: [-0.5, 0.5]       Offset: [-1, 3]
+
+Why Gaussians instead of G_CO3 reference:
+  The full G_CO3 reference spectrum from Excel has 97.7% of its energy
+  OUTSIDE the CO3 peaks (it includes a large negative background component).
+  This creates a correlation of r=0.79 with PCA baseline components,
+  causing severe degeneracy. Two narrow Gaussians (sigma=30) reduce
+  the maximum correlation to ~0.48, making bounded least squares stable.
+
+5.5 Quality Flags
+-----------------
+  GOOD:     R^2 >= 0.95, CO3 coefficient > 0, SNR >= 5
+  FAIR:     R^2 >= 0.80, CO3 coefficient > 0, SNR >= 2
+  POOR:     Everything else with positive CO3
+  NEGATIVE: CO3 coefficient <= 0 (no CO3 signal detected)
+  SUSPECT:  [pca_shift only] |peak shift| > 15 cm-1 (likely not CO3)
+
+SNR = CO3 absorbance / residual RMS
+
+5.6 CO3 Uncertainty Estimation
+------------------------------
+Two independent uncertainty sources are computed:
+
+(a) Fitting noise (random):
+    sigma_fit = residual_rms = sqrt(SS_residual / n_fit_points)
+
+    The RMS of fitting residuals estimates the noise level on each
+    peak height reading. Since CO3 absorbance is the average of two
+    peak heights that share the same baseline, this is a conservative
+    estimate.
+
+(b) Peak shift sensitivity (systematic):
+    The CO3 reference spectrum is shifted from -20 to +20 cm-1
+    in steps of 2 cm-1. At each shift, the spectrum is re-fitted and
+    a new CO3 absorbance is obtained. The half-range of resulting
+    values quantifies the sensitivity to peak position uncertainty:
+
+    sigma_shift = (max_CO3 - min_CO3) / 2
+
+(c) Combined uncertainty:
+    sigma_CO3 = sqrt(sigma_fit^2 + sigma_shift^2)
+
+    This is propagated through Beer-Lambert to CO2 ppm (see Step 5).
+
+
+================================================================================
+6. STEP 5 — CONCENTRATION CALCULATIONS (BEER-LAMBERT LAW)
+================================================================================
+
+6.1 Physical Basis
+------------------
+The Beer-Lambert law relates absorbance to concentration:
+
+  A = epsilon * c * d
+
+Where:
+  A       = absorbance (dimensionless)
+  epsilon = molar absorptivity (L / (mol * cm))
+  c       = concentration (mol/L)
+  d       = path length (cm)
+
+Rearranging for wt%:
+  c (mol/L) = A / (epsilon * d_cm)
+  wt%       = c * MW / rho_g/L * 100
+            = A * MW * 1e6 / (epsilon * d_um * rho_kg/m3)
+
+  (where d_cm = d_um / 10000, and rho_g/L = rho_kg/m3)
+
+6.2 Total H2O (wt%) from O-H Stretch (~3550 cm-1)
+--------------------------------------------------
+                    10^6 * A_OH * MW_H2O
+  H2O (wt%) = --------------------------------
+                epsilon_OH * rho_kgm3 * d_um
+
+Where:
+  A_OH       = baseline-corrected OH absorbance at 3550 cm-1 (Step 3)
+  MW_H2O     = 18.02 g/mol
+  epsilon_OH = 62.3 L/(mol*cm)
+  rho_kgm3   = glass density in kg/m3 (Step 2)
+  d_um       = sample thickness in um (Step 1)
+
+This uses the ACTUAL sample thickness.
+
+6.3 Molecular H2O (wt%) from 1630 cm-1 Bending Mode
+----------------------------------------------------
+                        10^6 * c_1630 * MW_H2O
+  H2Omol (wt%) = --------------------------------
+                  epsilon_1630 * rho_kgm3 * 100
+
+Where:
+  c_1630       = 1630 cm-1 coefficient from CO3 fitting (Step 4)
+  epsilon_1630 = 25.0 L/(mol*cm)
+  100          = NORMALIZED thickness (um), NOT actual thickness
+
+IMPORTANT: c_1630 comes from the CO3 fit of a spectrum normalized to
+100 um. Therefore the denominator uses 100, not d_um.
+
+6.4 CO2 (ppm) from CO3 Doublet
+-------------------------------
+                   10^10 * MW_CO2 * A_CO3
+  CO2 (ppm) = --------------------------------
+                epsilon_CO3 * rho_kgm3 * 100
+
+Where:
+  A_CO3       = CO3 absorbance (average of 1515 + 1430 peaks, Step 4)
+  MW_CO2      = 44.0 g/mol
+  epsilon_CO3 = 375.0 L/(mol*cm)
+  100         = NORMALIZED thickness (um)
+
+Same normalization convention as H2Omol: the spectrum was normalized
+to 100 um before fitting, so concentration formulas use 100.
+
+6.5 Uncertainty Propagation
+---------------------------
+For a quantity y = A * k / (eps * rho * d):
+
+  sigma_y / y = sqrt( (sigma_A / A)^2 + (sigma_d / d)^2 )
+
+(Molar absorptivity and density are treated as exact for the
+ purpose of error propagation within a single analysis.)
+
+TOTAL H2O UNCERTAINTY:
+
+  sigma_H2O / H2O = sqrt( (sigma_A_OH / A_OH)^2 + (sigma_d / d)^2 )
+
+  sigma_A_OH = peak height std from baseline anchor variation (Step 3)
+  sigma_d    = thickness std from multiple fringe measurements (Step 1)
+
+CO2 UNCERTAINTY:
+
+  sigma_CO2 / CO2 = sigma_CO3 / A_CO3
+
+  sigma_CO3 = combined CO3 uncertainty from fitting noise + shift
+              sensitivity (Step 4, Section 5.6)
+
+  Note: Thickness uncertainty does NOT additionally affect CO2 because
+  the spectrum is normalized to 100 um before fitting. However, the
+  normalization itself introduces a d-dependent scaling: if d is wrong,
+  the normalized spectrum is scaled incorrectly. This second-order
+  effect is captured by the shift sweep, which tests different peak
+  shapes that may arise from thickness mis-normalization.
+
+
+================================================================================
+7. DEFAULT PHYSICAL CONSTANTS
+================================================================================
+
+  Molar absorptivities:
+    epsilon_OH  (3550 cm-1)   = 62.3 L/(mol*cm)
+    epsilon_1630 (1630 cm-1)  = 25.0 L/(mol*cm)
+    epsilon_CO3 (1430/1515)   = 375.0 L/(mol*cm)
+
+  Molecular weights:
+    MW_H2O = 18.02 g/mol
+    MW_CO2 = 44.0 g/mol
+
+  Default parameters:
+    Fe3+/Fe_total = 0.15
+
+  Alternative values (PyIRoGlass, Shi et al. 2024):
+    epsilon_OH  = 64.5 L/(mol*cm)
+    epsilon_1630 = 34.5 L/(mol*cm)
+    epsilon_CO3 = 335.8 L/(mol*cm)
+
+  Users can specify custom absorptivities via function parameters.
+
+
+================================================================================
+8. INPUT DATA FORMAT
+================================================================================
+
+Spectrum files are plain text with two columns:
+
+  Column 1: wavenumber (cm-1)
+  Column 2: absorbance (transmission) or reflectance
+
+Supported delimiters: tab, comma, semicolon, space
+  (auto-detected from the last data line)
+
+File extensions: .txt, .csv, .dat (case-insensitive)
+
+Header lines: automatically detected and skipped
+  (any line where the first two fields cannot be parsed as numbers)
+
+Wavenumber order: ascending or descending (auto-sorted internally)
+
+Example (tab-delimited):
+  wavenumber    absorbance
+  649.89        2.062766
+  651.82        2.039498
+  653.75        2.015498
+  ...
+
+
+================================================================================
+9. REFERENCES
+================================================================================
+
+Church, B.N. & Johnson, W.M. (1980). Calculation of the refractive
+  index of silicate glasses from chemical composition. Geological
+  Society of America Bulletin, 91, 619-625.
+
+Lange, R.A. (1997). A revised model for the density and thermal
+  expansivity of K2O-Na2O-CaO-MgO-Al2O3-SiO2 liquids from 700 to
+  1900 K. Contributions to Mineralogy and Petrology, 130, 1-11.
+
+Luhr, J.F. (2001). Glass inclusions and melt volatile contents at
+  Paricutin volcano, Mexico. Contributions to Mineralogy and Petrology,
+  142, 261-283.
+
+Shi, G.N., et al. (2024). PyIRoGlass: An open-source, Bayesian MCMC
+  algorithm for fitting baselines to FTIR spectra of dissolved volatiles
+  in volcanic glasses. Volcanica, 7(2), 471-501.
+  doi:10.30909/vol.07.02.471501
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================

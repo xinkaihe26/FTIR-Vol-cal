@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FTIR Analysis Tool</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="container">
+
+    <header>
+        <h1>FTIR Vol-Cal</h1>
+        <p>Analyzing dissolved H<sub>2</sub>O and CO<sub>2</sub> in volcanic glass</p>
+        <button class="btn-changelog" onclick="toggleChangelog()">Version</button>
+    </header>
+
+    <!-- Version panel -->
+    <div id="changelog-panel" class="changelog-panel" style="display:none;">
+        <div class="changelog-header">
+            <h2>Version History</h2>
+            <button class="btn-close" onclick="toggleChangelog()">&times;</button>
+        </div>
+        <div class="changelog-body" id="changelog-body">
+            Loading...
+        </div>
+    </div>
+
+    <!-- ====== Mode Toggle ====== -->
+    <div class="mode-toggle-row">
+        <button type="button" id="btn-mode-single" class="btn-mode active" onclick="switchAppMode('single')">Single Sample</button>
+        <button type="button" id="btn-mode-batch" class="btn-mode" onclick="switchAppMode('batch')">Batch Processing</button>
+    </div>
+
+    <!-- ====== Batch Mode Panel ====== -->
+    <div id="batch-panel" style="display:none;">
+        <div class="form-section">
+            <h2>Batch File Upload</h2>
+            <div class="file-input-wrapper">
+                <label>Transmission Spectra <span style="color:#c0392b">*</span></label>
+                <span class="hint">Select multiple .txt/.csv/.dat files</span>
+                <input type="file" id="batch_files" accept=".txt,.csv,.dat,.tsv" multiple>
+            </div>
+            <div class="file-input-wrapper" style="margin-top:8px;">
+                <label>Reflectance Spectra <span class="hint">(Mode C only &mdash; filenames must match transmission files)</span></label>
+                <input type="file" id="batch_ref_files" accept=".txt,.csv,.dat,.tsv" multiple>
+            </div>
+            <div class="field-row" style="margin-top:12px;">
+                <label for="batch_param_mode">Parameters</label>
+                <select id="batch_param_mode" onchange="switchBatchParamMode(this.value)">
+                    <option value="unified">Unified &mdash; use parameters below for all samples</option>
+                    <option value="csv">Per-sample &mdash; upload a parameter CSV</option>
+                </select>
+            </div>
+            <div id="batch-csv-panel" style="display:none;margin-top:12px;">
+                <div class="file-input-wrapper">
+                    <label>Parameter CSV</label>
+                    <span class="hint">
+                        Columns: filename, thickness_um, thickness_unc_um, SiO2, TiO2, Al2O3, FeOT, MnO, MgO, CaO, Na2O, K2O, olivine_fo, co3_model, fringe_correction, use_composition_epsilon
+                        &nbsp;
+                        <a href="#" onclick="downloadParamTemplate(); return false;" style="color:#2c5f8a;">Download template</a>
+                    </span>
+                    <input type="file" id="batch_param_csv" accept=".csv">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Single Mode: 1. File Upload ====== -->
+    <div id="single-panel">
+    <div class="form-section">
+        <h2>1. Spectrum File Upload</h2>
+        <div class="file-input-wrapper">
+            <label for="transmission_file">Transmission Spectrum <span style="color:#c0392b">*</span></label>
+            <span class="hint">.txt,.csv,.dat (wavenumber and absorbance)</span>
+            <input type="file" id="transmission_file" accept=".txt,.csv,.dat">
+        </div>
+        <div class="file-input-wrapper">
+            <label for="reflectance_file">Reflectance Spectrum <span class="hint">(required for Mode C only)</span></label>
+            <input type="file" id="reflectance_file" accept=".txt,.csv,.dat">
+        </div>
+    </div>
+    </div>
+
+    <!-- ====== 2. Glass Composition ====== -->
+    <div class="form-section">
+        <h2>2. Glass Composition (wt%)</h2>
+        <div class="comp-grid">
+            <div class="comp-item">
+                <label for="comp_SiO2">SiO<sub>2</sub></label>
+                <input type="number" id="comp_SiO2" step="any">
+            </div>
+            <div class="comp-item">
+                <label for="comp_TiO2">TiO<sub>2</sub></label>
+                <input type="number" id="comp_TiO2" step="any">
+            </div>
+            <div class="comp-item">
+                <label for="comp_Al2O3">Al<sub>2</sub>O<sub>3</sub></label>
+                <input type="number" id="comp_Al2O3" step="any">
+            </div>
+            <div class="comp-item">
+                <label for="comp_FeOT">FeO<sub>T</sub></label>
+                <input type="number" id="comp_FeOT" step="any">
+            </div>
+            <div class="comp-item">
+                <label for="comp_MnO">MnO</label>
+                <input type="number" id="comp_MnO" step="any">
+            </div>
+            <div class="comp-item">
+                <label for="comp_MgO">MgO</label>
+                <input type="number" id="comp_MgO" step="any">
+            </div>
+            <div class="comp-item">
+                <label for="comp_CaO">CaO</label>
+                <input type="number" id="comp_CaO" step="any">
+            </div>
+            <div class="comp-item">
+                <label for="comp_Na2O">Na<sub>2</sub>O</label>
+                <input type="number" id="comp_Na2O" step="any">
+            </div>
+            <div class="comp-item">
+                <label for="comp_K2O">K<sub>2</sub>O</label>
+                <input type="number" id="comp_K2O" step="any">
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 3. Thickness ====== -->
+    <div class="form-section">
+        <h2>3. Thickness Determination</h2>
+        <div class="field-row">
+            <label for="thickness_mode">Method</label>
+            <select id="thickness_mode">
+                <option value="A">Mode A &mdash; Manual fringe counts</option>
+                <option value="B">Mode B &mdash; Direct thickness value</option>
+                <option value="C">Mode C &mdash; Calculate from reflectance spectrum</option>
+            </select>
+        </div>
+
+        <!-- Mode A panel -->
+        <div id="panel-A" class="mode-panel">
+            <p style="font-size:0.85em;color:#666;margin-bottom:8px;">
+                Enter fringe count measurements. Each row: high wavenumber, low wavenumber,
+                and number of fringes (N) counted between them.
+            </p>
+            <table class="fringe-table" id="fringe-table">
+                <thead>
+                    <tr>
+                        <th>High wn (cm<sup>-1</sup>)</th>
+                        <th>Low wn (cm<sup>-1</sup>)</th>
+                        <th>N (fringes)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="number" class="fringe-hi" step="any"></td>
+                        <td><input type="number" class="fringe-lo" step="any"></td>
+                        <td><input type="number" class="fringe-n" step="1" min="1"></td>
+                        <td><button type="button" class="btn-sm btn-remove" onclick="removeFringeRow(this)">Remove</button></td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="button" class="btn-sm btn-add" onclick="addFringeRow()">+ Add Row</button>
+            <div class="field-row" style="margin-top:12px;">
+                <label for="olivine_fo_a">Olivine Fo# <span style="color:#c0392b">*</span></label>
+                <input type="number" id="olivine_fo_a" step="any" placeholder="e.g. 85">
+            </div>
+        </div>
+
+        <!-- Mode B panel -->
+        <div id="panel-B" class="mode-panel active">
+            <div class="field-row">
+                <label for="thickness_um">Thickness (um)</label>
+                <input type="number" id="thickness_um" step="any">
+            </div>
+            <div class="field-row">
+                <label for="thickness_unc_um">Uncertainty (um)</label>
+                <input type="number" id="thickness_unc_um" step="any">
+            </div>
+        </div>
+
+        <!-- Mode C panel -->
+        <div id="panel-C" class="mode-panel">
+            <p style="font-size:0.85em;color:#666;margin-bottom:8px;">
+                Upload a reflectance spectrum above. The program will automatically detect
+                interference fringes (1800-3000 cm<sup>-1</sup>) and calculate thickness.
+            </p>
+            <div class="field-row">
+                <label for="olivine_fo">Olivine Fo#</label>
+                <input type="number" id="olivine_fo" step="any">
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 4. CO3 Fitting Model ====== -->
+    <div class="form-section">
+        <h2>4. CO<sub>2</sub> doublet Fitting</h2>
+        <div class="field-row">
+            <label for="co3_model">Model</label>
+            <select id="co3_model">
+                <option value="fixed">Simple lstsq </option>
+                <option value="taylor">lstsq with shifted peak position</option>
+                <option value="pca_shift">PCA baseline</option>
+            </select>
+        </div>
+        <div class="field-row">
+            <label for="fringe_correction">Fringe Correction</label>
+            <select id="fringe_correction">
+                <option value="auto">Auto &mdash; correct if fringes found</option>
+                <option value="never">Off &mdash; No fringe correction (recommended for good spectra)</option>
+                <option value="always">Always &mdash; Force fringe correction</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ====== 5. Advanced Parameters ====== -->
+    <div class="form-section">
+        <h2>5. Advanced Parameters</h2>
+        <details>
+            <summary>Click to expand</summary>
+
+            <div class="field-row" style="margin-top:12px;">
+                <label for="fe3_ratio">Fe<sup>3+</sup>/Fe<sub>total</sub></label>
+                <input type="number" id="fe3_ratio" step="any">
+            </div>
+
+            <div class="checkbox-row">
+                <input type="checkbox" id="use_composition_epsilon">
+                <label for="use_composition_epsilon" style="font-weight:600;">
+                    Use composition-dependent absorptivities (Shi et al. 2024)
+                </label>
+            </div>
+
+            <div id="epsilon-fields">
+                <div class="field-row" style="margin-top:10px;">
+                    <label for="epsilon_oh">Epsilon OH (3570)</label>
+                    <input type="number" id="epsilon_oh" step="any">
+                    <span class="hint">L/(mol*cm)</span>
+                </div>
+                <div class="field-row">
+                    <label for="epsilon_h2omol">Epsilon H<sub>2</sub>O<sub>mol</sub> (1630)</label>
+                    <input type="number" id="epsilon_h2omol" step="any">
+                    <span class="hint">L/(mol*cm)</span>
+                </div>
+                <div class="field-row">
+                    <label for="epsilon_co3">Epsilon CO<sub>3</sub></label>
+                    <input type="number" id="epsilon_co3" step="any">
+                    <span class="hint">L/(mol*cm)</span>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <!-- ====== Submit ====== -->
+    <div class="submit-row">
+        <button type="button" id="btn-run" class="btn-submit" onclick="submitAnalysis()">
+            Run Analysis
+        </button>
+        <button type="button" id="btn-batch-run" class="btn-submit" style="display:none;" onclick="submitBatch()">
+            Run Batch
+        </button>
+    </div>
+
+    <!-- ====== Status ====== -->
+    <div id="status"></div>
+
+    <!-- ====== Results ====== -->
+    <div id="results-section">
+
+        <!-- Thickness & Physical Properties -->
+        <div class="result-card" id="card-physical">
+            <h2>Physical Properties</h2>
+            <table class="result-table" id="table-physical">
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- H2O Peak -->
+        <div class="result-card" id="card-h2o">
+            <h2>H<sub>2</sub>O Peak (3550 cm<sup>-1</sup>)</h2>
+            <table class="result-table" id="table-h2o">
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- CO3 Fit -->
+        <div class="result-card" id="card-co3">
+            <h2>CO<sub>3</sub> Fit Results</h2>
+            <table class="result-table" id="table-co3">
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Concentrations -->
+        <div class="result-card" id="card-conc">
+            <h2>Concentrations</h2>
+            <table class="result-table" id="table-conc">
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Diagnostic Figures -->
+        <div class="result-card" id="card-figures">
+            <h2>Diagnostic Figures</h2>
+            <div class="figures-grid" id="figures-grid"></div>
+        </div>
+
+        <!-- Download buttons -->
+        <div class="download-row">
+            <button type="button" class="btn-download" onclick="downloadCSV()">Download Results (CSV)</button>
+            <button type="button" class="btn-download btn-download-fig" onclick="downloadFigures()">Download Figures (ZIP)</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
