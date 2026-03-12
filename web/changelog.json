@@ -1,5 +1,12 @@
 [
      {
+        "date": "2026-03-12",
+        "items": [
+            "Web app is online, feel free to try it out and provide feedback!",
+            
+            ]
+    },
+     {
         "date": "2026-03-11",
         "items": [
             "Added batch file fitting options",
