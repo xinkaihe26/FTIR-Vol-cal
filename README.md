@@ -2,7 +2,7 @@
 
 Python toolkit for analyzing dissolved H2O and CO2 in volcanic glass samples from FTIR spectra.
 
-Replaces the following Excel templates:
+Replaces the following Excel templates for H2O and CO2 calculation, you can find it in resorpitory :
 - Reflectance Method Template (thickness)
 - Glass density and index of refraction Template (density, refractive index)
 - CO2_bestfit.xls (CO3 carbonate doublet fitting)
