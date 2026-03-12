@@ -1,8 +1,8 @@
 # FTIR Volatile Analysis Tools
 
-Python toolkit for analyzing dissolved H2O and CO2 in volcanic glass samples from FTIR spectra.
+Python toolkit for analyzing dissolved H2O and CO2 in volcanic glass samples from FTIR spectra. Please check out the Web app version if it is easier to use: https://ftir-vol-cal.onrender.com/
 
-Replaces the following Excel templates for H2O and CO2 calculation, you can find it in resorpitory :
+Replaces the following Excel templates for H2O and CO2 calculation, which you can find in the repository :
 - Reflectance Method Template (thickness)
 - Glass density and index of refraction Template (density, refractive index)
 - CO2_bestfit.xls (CO3 carbonate doublet fitting)
@@ -21,7 +21,7 @@ python run_example.py
 ```
 
 This runs a complete analysis on the example spectrum (`example/trans example.txt`)
-using JT12 glass composition, printing all results and saving diagnostic plots to `example/`.
+using a fixed glass composition (Hawaii MI, for example), printing all results and saving diagnostic plots to `example/`.
 
 ## Usage
 
@@ -62,7 +62,6 @@ co2_reference_spectra.json # CO3 reference spectra
 run_example.py             # Usage example script
 example/                   # Example spectra and output plots
 verification_scripts/      # Excel-vs-Python verification scripts
-CLAUDE.md                  # Detailed project documentation
 ```
 
 ## Modules
