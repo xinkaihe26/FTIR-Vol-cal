@@ -7,6 +7,16 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+<nav class="top-nav">
+    <div class="nav-inner">
+        <a href="/" class="nav-brand">FTIR Vol-Cal</a>
+        <div class="nav-links">
+            <a href="/" class="nav-link active">Analysis</a>
+            <a href="/about" class="nav-link">About</a>
+        </div>
+    </div>
+</nav>
+
 <div class="container">
 
     <header>
@@ -306,6 +316,65 @@
             <div class="figures-grid" id="figures-grid"></div>
         </div>
 
+        <!-- Interactive CO3 Fit Chart -->
+        <div class="result-card" id="card-co3-interactive" style="display:none;">
+            <h2>CO3 Fit — Interactive</h2>
+            <p class="chart-hint">Drag to zoom, double-click to reset. Use toolbar to pan/zoom.</p>
+            <div id="co3-plotly-chart"></div>
+            <div class="download-row" style="margin-top:10px;">
+                <button type="button" class="btn-download" onclick="downloadCO3FitCSV()">Download CO3 Fit Data (CSV)</button>
+            </div>
+        </div>
+
+        <!-- Interactive H2O Baseline Chart -->
+        <div class="result-card" id="card-h2o-interactive" style="display:none;">
+            <h2>H<sub>2</sub>O Baseline — Interactive</h2>
+            <p class="chart-hint">Drag to zoom, double-click to reset.</p>
+            <div class="anchor-controls">
+                <div class="anchor-group">
+                    <span class="anchor-label">Mode:</span>
+                    <select id="h2o_anchor_mode" class="anchor-input" style="width:auto;" onchange="switchAnchorMode()">
+                        <option value="range">Range average</option>
+                        <option value="point">Pick points</option>
+                    </select>
+                </div>
+                <button type="button" class="btn-sm btn-reset-anchors" onclick="resetH2OAnchors()">Reset</button>
+            </div>
+            <!-- Range mode controls -->
+            <div class="anchor-controls" id="h2o-range-controls">
+                <div class="anchor-group">
+                    <span class="anchor-label">Low anchor (cm<sup>-1</sup>):</span>
+                    <input type="number" id="h2o_anchor_low_min" step="any" class="anchor-input">
+                    <span class="anchor-dash">&ndash;</span>
+                    <input type="number" id="h2o_anchor_low_max" step="any" class="anchor-input">
+                </div>
+                <div class="anchor-group">
+                    <span class="anchor-label">High anchor (cm<sup>-1</sup>):</span>
+                    <input type="number" id="h2o_anchor_high_min" step="any" class="anchor-input">
+                    <span class="anchor-dash">&ndash;</span>
+                    <input type="number" id="h2o_anchor_high_max" step="any" class="anchor-input">
+                </div>
+            </div>
+            <!-- Pick-points mode controls -->
+            <div class="anchor-controls" id="h2o-point-controls" style="display:none;">
+                <div class="anchor-group">
+                    <span class="anchor-label">Low point (cm<sup>-1</sup>):</span>
+                    <input type="number" id="h2o_point_low" step="any" class="anchor-input">
+                </div>
+                <div class="anchor-group">
+                    <span class="anchor-label">High point (cm<sup>-1</sup>):</span>
+                    <input type="number" id="h2o_point_high" step="any" class="anchor-input">
+                </div>
+                <span class="chart-hint" style="margin:0;">Click on the spectrum to set anchors (alternates low / high).</span>
+            </div>
+            <div id="h2o-peak-display" class="peak-display"></div>
+            <div id="h2o-anchor-status" class="anchor-status"></div>
+            <div id="h2o-plotly-chart"></div>
+            <div class="download-row" style="margin-top:10px;">
+                <button type="button" class="btn-download" onclick="downloadH2OBaselineCSV()">Download H2O Baseline Data (CSV)</button>
+            </div>
+        </div>
+
         <!-- Download buttons -->
         <div class="download-row">
             <button type="button" class="btn-download" onclick="downloadCSV()">Download Results (CSV)</button>
@@ -316,6 +385,7 @@
 
 </div>
 
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

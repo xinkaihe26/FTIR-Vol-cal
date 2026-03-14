@@ -730,9 +730,9 @@ def _read_spectrum_csv(filepath: Union[str, Path]) -> Tuple[np.ndarray, np.ndarr
 
 def fit_h2o_peak(
     spectrum_csv_path: Union[str, Path],
-    peak_range: Tuple[float, float] = (2200, 3800),
+    peak_range: Tuple[float, float] = (2200, 4000),
     baseline_low_range: Tuple[float, float] = (2200, 2400),
-    baseline_high_range: Optional[Tuple[float, float]] = None,
+    baseline_high_range: Tuple[float, float] = (3700, 4000),
     peak_target_wn: float = 3550.0,
     anchor_width: int = 10,
     compute_uncertainty: bool = False,
@@ -817,9 +817,7 @@ def fit_h2o_peak(
     wn_lo_anchor = wn[lo_mask].mean()
     ab_lo_anchor = ab[lo_mask].mean()
 
-    # --- High-side anchor (default: top 100 cm-1 of peak_range) ---
-    if baseline_high_range is None:
-        baseline_high_range = (hi - 100, hi)
+    # --- High-side anchor ---
     bh_lo = min(baseline_high_range)
     bh_hi = max(baseline_high_range)
     hi_mask = (wn >= bh_lo) & (wn <= bh_hi)
@@ -953,9 +951,9 @@ def fit_h2o_peak(
 
 def batch_fit_h2o(
     csv_folder_path: Union[str, Path],
-    peak_range: Tuple[float, float] = (2200, 3800),
+    peak_range: Tuple[float, float] = (2200, 4000),
     baseline_low_range: Tuple[float, float] = (2200, 2400),
-    baseline_high_range: Optional[Tuple[float, float]] = None,
+    baseline_high_range: Tuple[float, float] = (3700, 4000),
     anchor_width: int = 10,
     save_figures: bool = True,
     csv_extensions: Tuple[str, ...] = (".csv", ".CSV", ".txt", ".TXT", ".dat", ".DAT"),
@@ -2002,47 +2000,37 @@ def fit_carbonate(
         ax1.plot(wn_ref, data_on_grid, "k-", lw=0.8, label="Sample data")
         ax1.plot(wn_ref, fitted_full, "r-", lw=1.2, label="Fitted model")
         if model == "pca_shift":
-            # Show PCA baseline, H2Om, and two CO3 Gaussians
-            ax1.plot(wn_ref, _pca_baseline_full + _pca_linear_full,
-                     "g--", lw=0.6, alpha=0.7, label="PCA baseline")
-            ax1.plot(wn_ref, _pca_h2om_full, "b--", lw=0.6, alpha=0.7,
-                     label="H$_2$Om,1635 PCA")
+            ax1.plot(wn_ref, fit_no_co3, "g-", lw=1.0, alpha=0.8,
+                     label="PCA baseline")
             ax1.plot(wn_ref, _pca_co3_full, "m--", lw=0.6, alpha=0.7,
                      label=f"CO$_3^{{2-}}$ (1430={_amp1430:.4f}, 1515={_amp1515:.4f})")
-            # ax1.plot(wn_ref, fit_no_co3, "g-", lw=1.0, alpha=0.8,
-            #          label="Background (excl. CO$_3^{2-}$)")
         elif model == "taylor":
-            ax1.plot(wn_ref, c1 * E_bkg + c0, "g--", lw=0.6, alpha=0.7,
-                     label=f"Background (c_bkg={c1:.4f})")
-            ax1.plot(wn_ref, c2 * F_1630, "b--", lw=0.6, alpha=0.7,
-                     label=f"1630 H$_2$O (c_1630={c2:.4f})")
+            ax1.plot(wn_ref, fit_no_co3, "g-", lw=1.0, alpha=0.8,
+                     label="Background (excl. CO$_3^{2-}$)")
             ax1.plot(wn_ref, _co3_full_t, "m--", lw=0.6, alpha=0.7,
                      label=f"CO$_3^{{2-}}$ (1430={_amp1430:.4f}, 1515={_amp1515:.4f})")
-            # ax1.plot(wn_ref, fit_no_co3, "g-", lw=1.0, alpha=0.8,
-            #          label="Background (excl. CO$_3^{2-}$)")
         else:
-            ax1.plot(wn_ref, c1 * E_bkg + c0, "g--", lw=0.6, alpha=0.7,
-                     label=f"Background (c_bkg={c1:.4f})")
-            ax1.plot(wn_ref, c2 * F_1630, "b--", lw=0.6, alpha=0.7,
-                     label=f"1630 H$_2$O (c_1630={c2:.4f})")
+            ax1.plot(wn_ref, fit_no_co3, "g-", lw=1.0, alpha=0.8,
+                     label="Background (excl. CO$_3^{2-}$)")
             ax1.plot(wn_ref, c3 * G_CO3, "m--", lw=0.6, alpha=0.7,
                      label=f"CO$_3^{{2-}}$ (c_CO3={c3:.4f})")
-            # ax1.plot(wn_ref, fit_no_co3, "g-", lw=1.0, alpha=0.8,
-            #          label="Background (excl. CO$_3^{2-}$)")
         ax1.axvspan(fit_lo, fit_hi, color="yellow", alpha=0.1, label="Fitting range")
         ax1.set_ylabel("Absorbance")
+        _model_display = {
+            "fixed": "Simple lstsq",
+            "taylor": "lstsq with shifted peak position",
+            "pca_shift": "PCA baseline",
+        }.get(model, model)
         title_extra = ""
         if model in ("taylor", "pca_shift"):
             title_extra = (f"  |  d1430={_shift1430:+.1f}  d1515={_shift1515:+.1f} cm$^{{-1}}$")
         ax1.set_title(
-            f"CO$_3^{{2-}}$ Carbonate Fit [{model}] — {Path(spectrum_csv_path).stem}\n"
+            f"CO$_3^{{2-}}$ Carbonate Fit [{_model_display}] — {Path(spectrum_csv_path).stem}\n"
             f"R$^2$ = {r_squared:.6f}{title_extra}"
         )
         ax1.legend(fontsize=8, loc="upper left")
-        if model == "pca_shift":
-            ax1.set_xlim(fit_hi + 50, fit_lo - 50)  # show full PCA range
-        else:
-            ax1.set_xlim(1800, 1300)   # focus on fitting/CO3 region
+        ax1.set_xlim(2000, 1200)
+        ax1.set_ylim(0, 3)
         ax1.grid(True, alpha=0.3)
 
         # Panel 2: CO₃²⁻ band by subtraction
@@ -2134,6 +2122,12 @@ def fit_carbonate(
     # (c) Combined uncertainty (fitting noise + shift sensitivity in quadrature)
     co3_total_unc = float(np.sqrt(co3_absorbance_unc**2 + co3_shift_unc**2))
 
+    # Baseline array (for interactive plotting)
+    if model == "pca_shift":
+        _baseline_array = _pca_baseline_full + _pca_linear_full
+    else:
+        _baseline_array = c0 + c1 * E_bkg
+
     result_dict = {
         "coefficients": coefficients,
         "model": model,
@@ -2159,6 +2153,12 @@ def fit_carbonate(
         "data": data_on_grid,
         "fitted": fitted_full,
         "co3_subtracted": co3_subtracted,
+        "background": fit_no_co3,
+        "baseline": _baseline_array,
+        "co3_component": fitted_full - fit_no_co3,
+        "fit_range": [float(fit_lo), float(fit_hi)],
+        "fit_wavenumber": wn_ref[fit_mask],
+        "residuals": residuals,
         "figure_path": fig_saved,
         # taylor/pca_shift specific
         "shift_1430": float(_shift1430) if model in ("taylor", "pca_shift") else None,
@@ -2610,9 +2610,9 @@ def process_sample(
     reflectance_csv: Optional[Union[str, Path]] = None,
     olivine_fo: Optional[float] = None,
     fe3_ratio: float = 0.15,
-    h2o_baseline_range: Tuple[float, float] = (2200, 3800),
+    h2o_baseline_range: Tuple[float, float] = (2200, 4000),
     h2o_baseline_low: Tuple[float, float] = (2200, 2400),
-    h2o_baseline_high: Optional[Tuple[float, float]] = None,
+    h2o_baseline_high: Tuple[float, float] = (3700, 4000),
     co3_fit_range: Tuple[float, float] = (1350.0, 1800.0),
     co3_model: str = "fixed",
     fringe_correction: str = "auto",
@@ -2762,12 +2762,11 @@ def process_sample(
     h2o_kwargs = dict(
         peak_range=h2o_baseline_range,
         baseline_low_range=h2o_baseline_low,
+        baseline_high_range=h2o_baseline_high,
         compute_uncertainty=True,
         save_figure=save_figures,
         figure_path=h2o_fig,
     )
-    if h2o_baseline_high is not None:
-        h2o_kwargs["baseline_high_range"] = h2o_baseline_high
     h2o_result = fit_h2o_peak(spectrum_csv, **h2o_kwargs)
 
     # --- Module 4: CO3 carbonate fitting ---
@@ -2876,6 +2875,13 @@ def process_sample(
             "peak_height_std": h2o_result.get("peak_height_std", 0.0),
             "peak_height_range": h2o_result.get("peak_height_range", None),
             "figure_path": h2o_result["figure_path"],
+            # Arrays for interactive baseline plotting
+            "wavenumber": h2o_result["wavenumber"],
+            "raw_absorbance": h2o_result["raw_absorbance"],
+            "baseline": h2o_result["baseline"],
+            "baseline_corrected": h2o_result["baseline_corrected_absorbance"],
+            "baseline_low_range": list(h2o_kwargs["baseline_low_range"]),
+            "baseline_high_range": list(h2o_kwargs["baseline_high_range"]),
         },
         "co3_fit": {
             "coefficients": co3_result["coefficients"],
@@ -2896,7 +2902,22 @@ def process_sample(
             "fringe_ratio": co3_result.get("fringe_ratio", 0.0),
             "fringe_corrected": co3_result.get("fringe_corrected", False),
             "fringe_period_est": co3_result.get("fringe_period_est", 0.0),
+            "model": co3_result.get("model", ""),
+            "co3_peak_1515": co3_result.get("co3_peak_1515", 0.0),
+            "co3_peak_1430": co3_result.get("co3_peak_1430", 0.0),
+            "doublet_ratio": co3_result.get("doublet_ratio", 0.0),
             "figure_path": co3_result["figure_path"],
+            # Arrays for interactive plotting
+            "wavenumber": co3_result.get("wavenumber"),
+            "data": co3_result.get("data"),
+            "fitted": co3_result.get("fitted"),
+            "co3_subtracted": co3_result.get("co3_subtracted"),
+            "background": co3_result.get("background"),
+            "baseline": co3_result.get("baseline"),
+            "co3_component": co3_result.get("co3_component"),
+            "fit_range": co3_result.get("fit_range"),
+            "fit_wavenumber": co3_result.get("fit_wavenumber"),
+            "residuals": co3_result.get("residuals"),
         },
         "concentration": conc_result,
     }

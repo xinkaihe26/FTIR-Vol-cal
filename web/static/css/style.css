@@ -12,6 +12,45 @@ body {
     line-height: 1.5;
 }
 
+/* --- Top navigation bar --- */
+.top-nav {
+    background: #2c5f8a;
+    padding: 0 20px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.nav-inner {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 50px;
+}
+.nav-brand {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+}
+.nav-links {
+    display: flex;
+    gap: 4px;
+}
+.nav-link {
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: 600;
+    transition: background 0.2s, color 0.2s;
+}
+.nav-link:hover { background: rgba(255,255,255,0.15); color: #fff; }
+.nav-link.active { background: rgba(255,255,255,0.2); color: #fff; }
+
 /* --- Layout --- */
 .container {
     max-width: 960px;
@@ -412,6 +451,132 @@ details summary {
 .btn-download:hover { background: #1e8449; }
 .btn-download-fig { background: #2c5f8a; }
 .btn-download-fig:hover { background: #1e4468; }
+
+/* --- Interactive charts --- */
+.chart-hint {
+    font-size: 0.82em;
+    color: #888;
+    margin: 0 0 8px;
+}
+#co3-plotly-chart {
+    width: 100%;
+    min-height: 700px;
+}
+#h2o-plotly-chart {
+    width: 100%;
+    min-height: 550px;
+}
+
+/* --- H2O anchor controls --- */
+.anchor-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+}
+.anchor-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.anchor-label {
+    font-weight: 600;
+    font-size: 0.88em;
+    color: #555;
+    white-space: nowrap;
+}
+.anchor-input {
+    width: 80px;
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9em;
+    text-align: center;
+}
+.anchor-input:focus {
+    border-color: #2c5f8a;
+    outline: none;
+    box-shadow: 0 0 3px rgba(44,95,138,0.3);
+}
+.anchor-dash {
+    color: #888;
+    font-size: 1.1em;
+}
+.btn-reset-anchors {
+    background: #6c757d;
+    color: #fff;
+    border: none;
+    padding: 5px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+.btn-reset-anchors:hover {
+    background: #545b62;
+}
+.peak-display {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: #2c5f8a;
+    margin: 6px 0;
+}
+.anchor-status {
+    font-size: 0.82em;
+    color: #c0392b;
+    min-height: 1.2em;
+}
+
+/* --- About page --- */
+.about-page {
+    padding: 10px 0 40px;
+}
+.about-page h1 {
+    font-size: 1.6em;
+    color: #2c5f8a;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #2c5f8a;
+}
+.about-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+}
+.about-section h2 {
+    font-size: 1.1em;
+    color: #2c5f8a;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #eee;
+}
+.about-section p {
+    margin-bottom: 10px;
+    line-height: 1.7;
+}
+.about-section ol, .about-section ul {
+    margin-left: 20px;
+    margin-bottom: 10px;
+}
+.about-section li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+.about-section a {
+    color: #2c5f8a;
+    text-decoration: underline;
+}
+.about-section a:hover {
+    color: #1e4468;
+}
 
 /* --- Responsive --- */
 @media (max-width: 640px) {

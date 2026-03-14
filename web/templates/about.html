@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About — FTIR Vol-Cal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<nav class="top-nav">
+    <div class="nav-inner">
+        <a href="/" class="nav-brand">FTIR Vol-Cal</a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Analysis</a>
+            <a href="/about" class="nav-link active">About</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+
+    <div class="about-page">
+
+        <h1>About FTIR Vol-Cal</h1>
+
+        <section class="about-section">
+            <h2>Overview</h2>
+            <p>
+                FTIR Vol-Cal is a tool for calculating dissolved H<sub>2</sub>O (wt%) and
+                CO<sub>2</sub> (ppm) concentrations in volcanic glass from FTIR transmission
+                spectra. It replaces a suite of Excel spreadsheet templates with a single,
+                reproducible workflow.
+            </p>
+        </section>
+
+        <section class="about-section">
+            <h2>How It Works</h2>
+            <ol>
+                <li><strong>Thickness</strong> — Determined from interference fringes (manual count,
+                    direct input, or automatic detection from reflectance spectrum).</li>
+                <li><strong>Density &amp; Refractive Index</strong> — Calculated from major oxide
+                    composition using the Church &amp; Johnson (1980) method.</li>
+                <li><strong>H<sub>2</sub>O Peak</strong> — Linear baseline correction through
+                    2200&ndash;2400 and 3700&ndash;3800 cm<sup>-1</sup>, peak height at 3550 cm<sup>-1</sup>.</li>
+                <li><strong>CO<sub>3</sub> Fitting</strong> — Three models available for the
+                    carbonate doublet (~1430/1515 cm<sup>-1</sup>):
+                    <ul>
+                        <li>Simple least-squares (matches Excel CO2_bestfit.xls)</li>
+                        <li>Least-squares with shifted peak positions</li>
+                        <li>PCA baseline (following Shi et al. 2024, PyIRoGlass)</li>
+                    </ul>
+                </li>
+                <li><strong>Concentrations</strong> — Beer-Lambert law with molar absorptivities.</li>
+            </ol>
+        </section>
+
+        <section class="about-section">
+            <h2>References</h2>
+            <ul>
+                <li>Shi, G. et al. (2024) PyIRoGlass. <em>Volcanica</em>, 7(2), 471&ndash;501.
+                    doi:10.30909/vol.07.02.471501</li>
+                <li>Church, B.N. &amp; Johnson, W.M. (1980) Calculation of the refractive index
+                    of silicate glasses from chemical composition. <em>GSA Bulletin</em>, 91(10),
+                    619&ndash;625.</li>
+            </ul>
+        </section>
+
+        <section class="about-section">
+            <h2>Source Code</h2>
+            <p>
+                The source code is available on GitHub:
+                <a href="https://github.com/xinkaihe26/FTIR-Vol-cal" target="_blank">
+                    github.com/xinkaihe26/FTIR-Vol-cal</a>
+            </p>
+        </section>
+
+        <section class="about-section">
+            <h2>Contact</h2>
+            <p>
+                For questions, bug reports, or feature requests, please open an issue on
+                <a href="https://github.com/xinkaihe26/FTIR-Vol-cal/issues" target="_blank">GitHub</a>.
+            </p>
+        </section>
+
+    </div>
+
+</div>
+</body>
+</html>

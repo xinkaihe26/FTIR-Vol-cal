@@ -1,5 +1,16 @@
 [
      {
+        "date": "2026-03-13",
+        "items": [
+            "Interactive CO3 fit chart (Plotly): zoomable, with Background (excl. CO3) trace and CSV download",
+            "Interactive H2O baseline chart: adjustable anchor ranges or pick-point mode with real-time recalculation",
+            "Fixed CO3 diagnostic plot: background line now correctly shows fit excluding CO3 (was previously showing only partial baseline)",
+            "CO3 plot axes standardized: x 1200-2000 cm-1, y 0-3 Absorbance",
+            "Model display names: Simple lstsq / lstsq with shifted peak position / PCA baseline",
+            "H2O high anchor default range expanded to 3700-4000 cm-1"
+            ]
+    },
+     {
         "date": "2026-03-12",
         "items": [
             "Web app is online, feel free to try it out and provide feedback!"
@@ -20,6 +31,7 @@
             "Residual plot title changed from 'Residuals - SS(E)' to 'Fit - Data'"
         ]
     },
+    
     {
         "date": "2026-03-09",
         "items": [
