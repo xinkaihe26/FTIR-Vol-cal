@@ -29,8 +29,6 @@ cd web
 python app.py
 ```
 
-Open http://localhost:5000 in your browser.
-
 ### Option 2: Command Line
 
 Process a single sample from a YAML config file:
