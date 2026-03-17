@@ -578,6 +578,17 @@ details summary {
     color: #1e4468;
 }
 
+/* --- Batch Viewer --- */
+#batch-viewer-section .result-card { margin-bottom: 18px; }
+#batch-summary-table-wrapper table { width: 100%; border-collapse: collapse; }
+#batch-summary-table-wrapper th {
+    background: #2c5f8a; color: #fff; padding: 6px 10px;
+    text-align: left; font-size: 12px;
+}
+#batch-summary-table-wrapper td { padding: 5px 10px; border-bottom: 1px solid #ecf0f1; }
+#batch-summary-table-wrapper tr:hover { background: #eaf2f8; }
+#batch-summary-table-wrapper tr.active-row { background: #d4e6f1; font-weight: 600; }
+
 /* --- Responsive --- */
 @media (max-width: 640px) {
     .comp-grid { grid-template-columns: repeat(3, 1fr); }

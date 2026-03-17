@@ -383,6 +383,38 @@
 
     </div>
 
+    <!-- ====== Batch Viewer ====== -->
+    <div id="batch-viewer-section" style="display:none;">
+        <div class="result-card">
+            <h2>Batch Results Viewer</h2>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+                <label for="batch-sample-select" style="font-weight:600;">Sample:</label>
+                <select id="batch-sample-select" onchange="onBatchSampleChange()" style="flex:1; max-width:400px; padding:6px 10px; border:1px solid #bdc3c7; border-radius:4px; font-size:14px;"></select>
+                <button type="button" class="btn-sm" onclick="batchViewerPrev()" title="Previous">&laquo; Prev</button>
+                <button type="button" class="btn-sm" onclick="batchViewerNext()" title="Next">Next &raquo;</button>
+                <span id="batch-viewer-counter" style="color:#7f8c8d; font-size:13px;"></span>
+            </div>
+            <div id="batch-viewer-info" style="background:#fef9e7; border:1px solid #f0e6c0; border-radius:6px; padding:10px 14px; margin-bottom:14px; font-family:monospace; font-size:13px;"></div>
+            <!-- Summary table -->
+            <div id="batch-summary-table-wrapper" style="margin-bottom:18px; overflow-x:auto;"></div>
+        </div>
+        <div class="result-card">
+            <h2>CO<sub>3</sub> Fit &mdash; <span id="batch-co3-title"></span></h2>
+            <div id="batch-co3-chart"></div>
+        </div>
+        <div class="result-card">
+            <h2>CO<sub>3</sub><sup>2&minus;</sup> Band by Subtraction</h2>
+            <div id="batch-co3-sub-chart"></div>
+        </div>
+        <div class="result-card">
+            <h2>H<sub>2</sub>O Baseline &mdash; <span id="batch-h2o-title"></span></h2>
+            <div id="batch-h2o-chart"></div>
+        </div>
+        <div class="download-row">
+            <button type="button" class="btn-download" onclick="downloadBatchCSV()">Download Batch Results (CSV)</button>
+        </div>
+    </div>
+
 </div>
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>

@@ -3001,6 +3001,219 @@ def process_batch(
     return results
 
 
+def interactive_batch_viewer(results: List[Dict]):
+    """Interactive viewer for batch processing results.
+
+    Opens a matplotlib window with Prev/Next buttons to browse through
+    fitted samples, showing H2O baseline correction and CO3 doublet fit.
+
+    Parameters
+    ----------
+    results : list of dict
+        Output from process_batch() or a list of process_sample() results.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.widgets import Button
+
+    # Filter out error results
+    valid = [r for r in results if "error" not in r]
+    if not valid:
+        print("No valid results to display.")
+        return
+
+    state = {"idx": 0}
+
+    fig = plt.figure(figsize=(16, 10))
+    # Leave space at top for info text and bottom for buttons
+    fig.subplots_adjust(top=0.88, bottom=0.10, hspace=0.35, wspace=0.30)
+
+    # 2x2 layout: top-left H2O raw+baseline, top-right H2O corrected,
+    # bottom-left CO3 fit, bottom-right CO3 subtracted
+    ax_h2o_raw = fig.add_subplot(2, 2, 1)
+    ax_h2o_cor = fig.add_subplot(2, 2, 2)
+    ax_co3_fit = fig.add_subplot(2, 2, 3)
+    ax_co3_sub = fig.add_subplot(2, 2, 4)
+
+    # Title text at top
+    title_text = fig.suptitle("", fontsize=12, fontweight="bold", y=0.96)
+    # Info text below title
+    info_text = fig.text(0.5, 0.92, "", ha="center", va="top", fontsize=10,
+                         family="monospace",
+                         bbox=dict(boxstyle="round,pad=0.4", fc="lightyellow",
+                                   ec="gray", alpha=0.9))
+
+    def draw_sample(idx):
+        res = valid[idx]
+        name = res["sample_name"]
+        h2o = res["h2o_peak"]
+        co3 = res["co3_fit"]
+        conc = res["concentration"]
+
+        # --- Title ---
+        title_text.set_text(
+            f"[{idx + 1}/{len(valid)}]  {name}"
+        )
+
+        # --- Info text ---
+        quality = co3.get("quality_flag", "")
+        model_name = co3.get("model", "fixed")
+        info_parts = [
+            f"H2O = {conc['total_h2o_wt_pct']:.3f} wt%",
+            f"CO2 = {conc['co2_ppm']:.1f} ppm",
+            f"R2 = {co3['r_squared']:.4f}",
+            f"Quality: {quality}",
+            f"Model: {model_name}",
+            f"d = {res['thickness']['average_um']:.1f} um",
+        ]
+        info_text.set_text("    ".join(info_parts))
+
+        # --- H2O: raw + baseline (top-left) ---
+        ax_h2o_raw.clear()
+        wn_h = h2o.get("wavenumber")
+        ab_h = h2o.get("raw_absorbance")
+        bl_h = h2o.get("baseline")
+        if wn_h is not None and ab_h is not None:
+            import numpy as _np
+            wn_h = _np.asarray(wn_h)
+            ab_h = _np.asarray(ab_h)
+            bl_h = _np.asarray(bl_h) if bl_h is not None else None
+            ax_h2o_raw.plot(wn_h, ab_h, "k-", lw=0.8, label="Raw spectrum")
+            if bl_h is not None:
+                ax_h2o_raw.plot(wn_h, bl_h, "r--", lw=1.0, label="Baseline")
+            lo_range = h2o.get("baseline_low_range", [2200, 2400])
+            hi_range = h2o.get("baseline_high_range", [3700, 3800])
+            ax_h2o_raw.axvspan(lo_range[0], lo_range[1], color="green",
+                               alpha=0.12, label="Low anchor")
+            ax_h2o_raw.axvspan(hi_range[0], hi_range[1], color="orange",
+                               alpha=0.12, label="High anchor")
+            ax_h2o_raw.set_xlim(max(wn_h) + 50, min(wn_h) - 50)
+        ax_h2o_raw.set_ylabel("Absorbance")
+        ax_h2o_raw.set_title("H$_2$O Raw + Baseline")
+        ax_h2o_raw.legend(fontsize=7, loc="best")
+        ax_h2o_raw.grid(True, alpha=0.3)
+
+        # --- H2O: corrected (top-right) ---
+        ax_h2o_cor.clear()
+        corr_h = h2o.get("baseline_corrected")
+        if wn_h is not None and corr_h is not None:
+            corr_h = _np.asarray(corr_h)
+            ax_h2o_cor.fill_between(wn_h, 0, corr_h,
+                                    where=(corr_h > 0),
+                                    color="steelblue", alpha=0.3)
+            ax_h2o_cor.plot(wn_h, corr_h, "b-", lw=0.8)
+            ax_h2o_cor.axhline(0, color="gray", lw=0.5, ls="--")
+            pk_wn = h2o["peak_wavenumber"]
+            pk_ht = h2o["peak_height"]
+            ax_h2o_cor.plot(pk_wn, pk_ht, "rv", ms=8)
+            ax_h2o_cor.annotate(
+                f"{pk_ht:.4f} @ {pk_wn:.0f}",
+                xy=(pk_wn, pk_ht),
+                xytext=(pk_wn + 80, pk_ht * 0.8),
+                fontsize=9,
+                arrowprops=dict(arrowstyle="->", color="red"),
+                bbox=dict(boxstyle="round", fc="lightyellow", ec="gray"),
+            )
+            ax_h2o_cor.set_xlim(max(wn_h) + 50, min(wn_h) - 50)
+        ax_h2o_cor.set_ylabel("Corrected Absorbance")
+        ax_h2o_cor.set_title("H$_2$O Baseline-Corrected")
+        ax_h2o_cor.grid(True, alpha=0.3)
+
+        # --- CO3: fit (bottom-left) ---
+        ax_co3_fit.clear()
+        wn_c = co3.get("wavenumber")
+        data_c = co3.get("data")
+        fitted_c = co3.get("fitted")
+        bkg_c = co3.get("background")
+        co3_comp = co3.get("co3_component")
+        if wn_c is not None and data_c is not None:
+            wn_c = _np.asarray(wn_c)
+            data_c = _np.asarray(data_c)
+            ax_co3_fit.plot(wn_c, data_c, "k-", lw=0.8, label="Sample data")
+            if fitted_c is not None:
+                ax_co3_fit.plot(wn_c, _np.asarray(fitted_c), "r-", lw=1.2,
+                                label="Fitted model")
+            if bkg_c is not None:
+                ax_co3_fit.plot(wn_c, _np.asarray(bkg_c), "g-", lw=1.0,
+                                alpha=0.8, label="Background")
+            if co3_comp is not None:
+                ax_co3_fit.plot(wn_c, _np.asarray(co3_comp), "m--", lw=0.6,
+                                alpha=0.7, label="CO$_3^{2-}$ component")
+            fr = co3.get("fit_range")
+            if fr:
+                ax_co3_fit.axvspan(fr[0], fr[1], color="yellow", alpha=0.1)
+            ax_co3_fit.set_xlim(2000, 1200)
+            ax_co3_fit.set_ylim(bottom=0)
+        ax_co3_fit.set_xlabel("Wavenumber (cm$^{-1}$)")
+        ax_co3_fit.set_ylabel("Absorbance")
+        ax_co3_fit.set_title(
+            f"CO$_3^{{2-}}$ Fit  |  R$^2$={co3['r_squared']:.4f}  "
+            f"Quality: {quality}"
+        )
+        ax_co3_fit.legend(fontsize=7, loc="upper left")
+        ax_co3_fit.grid(True, alpha=0.3)
+
+        # --- CO3: subtracted (bottom-right) ---
+        ax_co3_sub.clear()
+        co3_sub = co3.get("co3_subtracted")
+        if wn_c is not None and co3_sub is not None:
+            co3_sub = _np.asarray(co3_sub)
+            p2_lo, p2_hi = 1300.0, 1900.0
+            p2_mask = (wn_c >= p2_lo) & (wn_c <= p2_hi)
+            ax_co3_sub.fill_between(wn_c[p2_mask], 0, co3_sub[p2_mask],
+                                    color="mediumpurple", alpha=0.3)
+            ax_co3_sub.plot(wn_c[p2_mask], co3_sub[p2_mask], "m-", lw=0.8)
+            ax_co3_sub.axhline(0, color="gray", lw=0.5, ls="--")
+            # Mark peaks
+            pk_1515 = co3.get("co3_peak_1515", 0)
+            pk_1430 = co3.get("co3_peak_1430", 0)
+            if pk_1515 and pk_1430:
+                ax_co3_sub.annotate(
+                    f"1515: {pk_1515:.4f}", xy=(1515, pk_1515),
+                    xytext=(1515 + 60, pk_1515 * 0.8), fontsize=8,
+                    arrowprops=dict(arrowstyle="->", color="red"),
+                    bbox=dict(boxstyle="round", fc="lightyellow", ec="gray"),
+                )
+                ax_co3_sub.annotate(
+                    f"1430: {pk_1430:.4f}", xy=(1430, pk_1430),
+                    xytext=(1430 - 100, pk_1430 * 0.8), fontsize=8,
+                    arrowprops=dict(arrowstyle="->", color="red"),
+                    bbox=dict(boxstyle="round", fc="lightyellow", ec="gray"),
+                )
+            ax_co3_sub.set_xlim(p2_hi, p2_lo)
+        ax_co3_sub.set_xlabel("Wavenumber (cm$^{-1}$)")
+        ax_co3_sub.set_ylabel("Absorbance (subtracted)")
+        ax_co3_sub.set_title("CO$_3^{2-}$ Band by Subtraction")
+        ax_co3_sub.grid(True, alpha=0.3)
+
+        fig.canvas.draw_idle()
+
+    def on_prev(event):
+        state["idx"] = (state["idx"] - 1) % len(valid)
+        draw_sample(state["idx"])
+
+    def on_next(event):
+        state["idx"] = (state["idx"] + 1) % len(valid)
+        draw_sample(state["idx"])
+
+    def on_key(event):
+        if event.key in ("left", "up"):
+            on_prev(event)
+        elif event.key in ("right", "down"):
+            on_next(event)
+
+    # Buttons
+    ax_prev = fig.add_axes([0.35, 0.01, 0.12, 0.04])
+    ax_next = fig.add_axes([0.53, 0.01, 0.12, 0.04])
+    btn_prev = Button(ax_prev, "<< Prev")
+    btn_next = Button(ax_next, "Next >>")
+    btn_prev.on_clicked(on_prev)
+    btn_next.on_clicked(on_next)
+    fig.canvas.mpl_connect("key_press_event", on_key)
+
+    draw_sample(0)
+    plt.show()
+
+
 def _write_summary_csv(results: List[Dict], output_csv: Union[str, Path]):
     """Write batch results to a CSV file."""
     import csv

@@ -310,6 +310,7 @@ def run_batch():
         out_dir.mkdir()
 
         summary_rows = []
+        all_results = []
         errors = []
 
         for filename, fpath in sorted(file_paths.items()):
@@ -317,8 +318,7 @@ def run_batch():
                 # Build kwargs for this sample
                 kwargs = {
                     "spectrum_csv": fpath,
-                    "save_figures": True,
-                    "output_dir": str(out_dir),
+                    "save_figures": False,
                 }
 
                 # Determine parameters (per-sample CSV overrides unified)
@@ -425,6 +425,7 @@ def run_batch():
 
                 # Run
                 result = process_sample(**kwargs)
+                all_results.append(result)
 
                 # Collect summary row
                 t = result.get("thickness", {})
@@ -471,37 +472,50 @@ def run_batch():
                     "total_H2O_wt%": f"ERROR: {e}",
                 })
 
-        # --- Build ZIP ---
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            # Summary CSV
-            if summary_rows:
-                cols = list(summary_rows[0].keys())
-                csv_buf = io.StringIO()
-                writer = csv.DictWriter(csv_buf, fieldnames=cols)
-                writer.writeheader()
-                for row in summary_rows:
-                    writer.writerow(row)
-                zf.writestr("batch_results.csv", csv_buf.getvalue())
+        # --- Build response ---
+        # Return JSON with per-sample chart data for the interactive viewer,
+        # plus the summary CSV as a string for download.
+        sample_results = []
+        for row in summary_rows:
+            fname = row["filename"]
+            # Find matching full result
+            full_res = None
+            for r in all_results:
+                if r.get("sample_name", "") == Path(fname).stem:
+                    full_res = r
+                    break
+            if full_res and "error" not in full_res:
+                sample_results.append({
+                    "sample_name": full_res.get("sample_name", fname),
+                    "thickness": _clean_dict(full_res.get("thickness", {})),
+                    "density": _clean_dict(full_res.get("density", {})),
+                    "h2o_peak": _clean_dict(full_res.get("h2o_peak", {})),
+                    "co3_fit": _clean_dict(full_res.get("co3_fit", {})),
+                    "concentration": _clean_dict(
+                        full_res.get("concentration", {})),
+                })
+            else:
+                sample_results.append({
+                    "sample_name": Path(fname).stem,
+                    "error": row.get("total_H2O_wt%", "Unknown error"),
+                })
 
-            # Figures
-            for fig_file in out_dir.glob("*.png"):
-                zf.write(str(fig_file), f"figures/{fig_file.name}")
+        # Build CSV string for download
+        csv_str = ""
+        if summary_rows:
+            cols = list(summary_rows[0].keys())
+            csv_buf = io.StringIO()
+            writer = csv.DictWriter(csv_buf, fieldnames=cols)
+            writer.writeheader()
+            for row in summary_rows:
+                writer.writerow(row)
+            csv_str = csv_buf.getvalue()
 
-            # Error log
-            if errors:
-                err_lines = [f"{e['filename']}: {e['error']}" for e in errors]
-                zf.writestr("errors.txt", "\n".join(err_lines))
-
-        zip_buffer.seek(0)
-
-        from flask import send_file
-        return send_file(
-            zip_buffer,
-            mimetype="application/zip",
-            as_attachment=True,
-            download_name="ftir_batch_results.zip",
-        )
+        return jsonify({
+            "results": sample_results,
+            "summary_csv": csv_str,
+            "errors": errors,
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

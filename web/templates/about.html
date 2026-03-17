@@ -3,8 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About — FTIR Vol-Cal</title>
+    <title>Documentation — FTIR Vol-Cal</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .doc-nav { background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:16px 20px; margin-bottom:24px; }
+        .doc-nav h3 { margin-bottom:10px; color:#2c5f8a; font-size:1em; }
+        .doc-nav ul { list-style:none; margin:0; padding:0; columns:2; }
+        .doc-nav li { margin-bottom:4px; }
+        .doc-nav a { color:#2c5f8a; text-decoration:none; font-size:0.92em; }
+        .doc-nav a:hover { text-decoration:underline; }
+        .about-section h3 { font-size:1em; color:#34495e; margin:16px 0 8px; }
+        .about-section h4 { font-size:0.95em; color:#555; margin:12px 0 6px; }
+        .about-section .formula { background:#f4f6f9; border-left:3px solid #2c5f8a; padding:8px 14px; margin:10px 0; font-family:monospace; font-size:0.92em; overflow-x:auto; }
+        .about-section .note { background:#fef9e7; border-left:3px solid #f0c040; padding:8px 14px; margin:10px 0; font-size:0.92em; }
+        .about-section .param-list { margin-left:24px; margin-bottom:10px; }
+        .about-section .param-list li { margin-bottom:4px; line-height:1.5; }
+        .quality-table { width:100%; border-collapse:collapse; margin:10px 0; font-size:0.92em; }
+        .quality-table th { background:#2c5f8a; color:#fff; padding:6px 12px; text-align:left; }
+        .quality-table td { padding:6px 12px; border-bottom:1px solid #eee; }
+        .quality-table tr:hover { background:#f0f4f8; }
+        @media (max-width:640px) { .doc-nav ul { columns:1; } }
+    </style>
 </head>
 <body>
 <nav class="top-nav">
@@ -12,78 +31,444 @@
         <a href="/" class="nav-brand">FTIR Vol-Cal</a>
         <div class="nav-links">
             <a href="/" class="nav-link">Analysis</a>
-            <a href="/about" class="nav-link active">About</a>
+            <a href="/about" class="nav-link active">Documentation</a>
         </div>
     </div>
 </nav>
 
 <div class="container">
+<div class="about-page">
 
-    <div class="about-page">
+    <h1>FTIR Vol-Cal Documentation</h1>
 
-        <h1>About FTIR Vol-Cal</h1>
-
-        <section class="about-section">
-            <h2>Overview</h2>
-            <p>
-                FTIR Vol-Cal is a tool for calculating dissolved H<sub>2</sub>O (wt%) and
-                CO<sub>2</sub> (ppm) concentrations in volcanic glass from FTIR transmission
-                spectra. It replaces a suite of Excel spreadsheet templates with a single,
-                reproducible workflow.
-            </p>
-        </section>
-
-        <section class="about-section">
-            <h2>How It Works</h2>
-            <ol>
-                <li><strong>Thickness</strong> — Determined from interference fringes (manual count,
-                    direct input, or automatic detection from reflectance spectrum).</li>
-                <li><strong>Density &amp; Refractive Index</strong> — Calculated from major oxide
-                    composition using the Church &amp; Johnson (1980) method.</li>
-                <li><strong>H<sub>2</sub>O Peak</strong> — Linear baseline correction through
-                    2200&ndash;2400 and 3700&ndash;3800 cm<sup>-1</sup>, peak height at 3550 cm<sup>-1</sup>.</li>
-                <li><strong>CO<sub>3</sub> Fitting</strong> — Three models available for the
-                    carbonate doublet (~1430/1515 cm<sup>-1</sup>):
-                    <ul>
-                        <li>Simple least-squares (matches Excel CO2_bestfit.xls)</li>
-                        <li>Least-squares with shifted peak positions</li>
-                        <li>PCA baseline (following Shi et al. 2024, PyIRoGlass)</li>
-                    </ul>
-                </li>
-                <li><strong>Concentrations</strong> — Beer-Lambert law with molar absorptivities.</li>
-            </ol>
-        </section>
-
-        <section class="about-section">
-            <h2>References</h2>
-            <ul>
-                <li>Shi, G. et al. (2024) PyIRoGlass. <em>Volcanica</em>, 7(2), 471&ndash;501.
-                    doi:10.30909/vol.07.02.471501</li>
-                <li>Church, B.N. &amp; Johnson, W.M. (1980) Calculation of the refractive index
-                    of silicate glasses from chemical composition. <em>GSA Bulletin</em>, 91(10),
-                    619&ndash;625.</li>
-            </ul>
-        </section>
-
-        <section class="about-section">
-            <h2>Source Code</h2>
-            <p>
-                The source code is available on GitHub:
-                <a href="https://github.com/xinkaihe26/FTIR-Vol-cal" target="_blank">
-                    github.com/xinkaihe26/FTIR-Vol-cal</a>
-            </p>
-        </section>
-
-        <section class="about-section">
-            <h2>Contact</h2>
-            <p>
-                For questions, bug reports, or feature requests, please open an issue on
-                <a href="https://github.com/xinkaihe26/FTIR-Vol-cal/issues" target="_blank">GitHub</a>.
-            </p>
-        </section>
-
+    <!-- Table of contents -->
+    <div class="doc-nav">
+        <h3>Contents</h3>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#input">1. Input Files</a></li>
+            <li><a href="#thickness">2.1 Thickness Determination</a></li>
+            <li><a href="#h2o">2.2 H<sub>2</sub>O Peak Fitting</a></li>
+            <li><a href="#co2">2.3 CO<sub>2</sub> Doublet Fitting</a></li>
+            <li><a href="#fringe">2.4 Fringe Correction</a></li>
+            <li><a href="#quality">2.5 Quality Estimation</a></li>
+            <li><a href="#output">3. Output</a></li>
+            <li><a href="#references">References</a></li>
+            <li><a href="#source">Source Code &amp; Contact</a></li>
+        </ul>
     </div>
 
+    <!-- ====== Overview ====== -->
+    <section class="about-section" id="overview">
+        <h2>Overview</h2>
+        <p>
+            FTIR Vol-Cal is an open-source spectral fitting tool for calculating dissolved
+            H<sub>2</sub>O (wt%) and CO<sub>2</sub> (ppm) concentrations in volcanic glass
+            and melt inclusion FTIR spectra. It replaces a suite of Excel spreadsheet templates
+            with a single, reproducible workflow and combines multiple mathematical fitting
+            approaches. It is coded in Python and published online for easier usability. You may
+            also download the source code and add other functions you need.
+        </p>
+    </section>
+
+    <!-- ====== 1. Input Files ====== -->
+    <section class="about-section" id="input">
+        <h2>1. Input Files</h2>
+
+        <h3>1.1 Transmission Spectrum <span style="color:#c0392b">(required)</span></h3>
+        <p>
+            Upload a transmission spectrum from FTIR measurement. The range of wavenumbers is
+            usually around 300&ndash;6000 cm<sup>&minus;1</sup>. FTIR Vol-Cal does not currently consider
+            water-saturated species and therefore does not fit OH (@4500 cm<sup>&minus;1</sup>) or
+            H<sub>2</sub>O<sub>m</sub> (@5200 cm<sup>&minus;1</sup>) &mdash; this will be updated soon.
+            To fit the H<sub>2</sub>O<sub>t</sub> peak, the range used is 2200&ndash;4000 cm<sup>&minus;1</sup>;
+            for the carbonate doublet, it uses 1200&ndash;2200 cm<sup>&minus;1</sup>.
+        </p>
+
+        <h3>1.2 Reflectance Spectrum <span style="color:#7f8c8d">(optional)</span></h3>
+        <p>
+            You may upload a reflectance spectrum to calculate glass wafer thickness automatically.
+            If you don&rsquo;t have one, you can enter the thickness measured by other methods
+            (micrometer, optical microscope, etc.) manually.
+        </p>
+
+        <h3>1.3 Glass Composition (wt%)</h3>
+        <p>
+            Glass composition affects density calculations, so detailed major element information
+            is required. A basaltic composition of Hawaiian melt inclusion is shown as an example.
+        </p>
+
+        <h3>1.4 Olivine Mg#</h3>
+        <p>
+            Olivine Mg# affects the calculation of refractive index. Enter the host olivine Fo
+            number. Currently only olivine refractive index is supported; other mineral phases
+            will be added in future updates.
+        </p>
+
+        <h3>1.5 Advanced Parameters</h3>
+        <p>
+            We use Fe<sup>3+</sup>/Fe<sub>total</sub> = 0.15 as default. You can change this value
+            manually. We convert FeO<sub>t</sub> to Fe<sub>2</sub>O<sub>3</sub> and FeO based on this
+            ratio for a more precise glass density. You can also enter custom epsilon values
+            (molar absorptivity) for OH, H<sub>2</sub>O<sub>mol</sub>, and CO<sub>3</sub>. These are
+            used in the Beer-Lambert law to calculate H<sub>2</sub>O and CO<sub>2</sub> concentrations.
+        </p>
+
+        <h3>1.6 Batch Processing</h3>
+        <p>
+            You can batch upload FTIR transmission spectra using the same or different reflectance
+            spectra and calculating parameters (compositions, Mg#, model choice). Transmission and
+            reflectance spectra should use the same sample file name. You can also upload per-sample
+            parameters via a CSV template.
+        </p>
+    </section>
+
+    <!-- ====== 2.1 Thickness ====== -->
+    <section class="about-section" id="thickness">
+        <h2>2.1 Thickness Determination</h2>
+
+        <h3>Mode A &mdash; Manual Fringe Counts</h3>
+        <p>
+            Input your counts of interference fringes between wavenumbers.
+        </p>
+        <div class="formula">d = N / (2 &times; n &times; (wn<sub>high</sub> &minus; wn<sub>low</sub>))</div>
+        <p>
+            where <em>n</em> is the glass refractive index (a function of olivine Fo#) and
+            <em>N</em> is the number of fringes between wn<sub>high</sub> and wn<sub>low</sub>.
+        </p>
+
+        <h3>Mode B &mdash; Direct Input</h3>
+        <p>Direct thickness measurement of your wafers.</p>
+
+        <h3>Mode C &mdash; Auto-Detect from Reflectance Spectrum</h3>
+        <p>Automatically calculated from reflectance spectra:</p>
+        <ol>
+            <li>Extract the 1800&ndash;3000 cm<sup>&minus;1</sup> range (clean, absorption-free window)</li>
+            <li>Savitzky-Golay smoothing to remove noise</li>
+            <li>Detect maxima and minima independently</li>
+            <li>Select the longest consecutive sub-sequence of consistent fringe intervals
+                (within 20% of the sub-sequence median), automatically rejecting false peaks
+                from noise or baseline drift</li>
+            <li>Thickness calculated from selected peaks, averaging maxima-derived and
+                minima-derived values</li>
+            <li>Uncertainty = standard deviation of per-interval thicknesses</li>
+        </ol>
+    </section>
+
+    <!-- ====== 2.2 H2O ====== -->
+    <section class="about-section" id="h2o">
+        <h2>2.2 H<sub>2</sub>O Peak Fitting</h2>
+        <p>H<sub>2</sub>O peak height is determined by linear baseline correction:</p>
+
+        <h3>Baseline</h3>
+        <p>
+            Linear baseline anchors are determined from two regions: low anchor (2200&ndash;2400
+            cm<sup>&minus;1</sup>) and high anchor (3700&ndash;4000 cm<sup>&minus;1</sup>). We use the mean
+            wavenumber and mean absorbance in each anchor region to define the baseline. This
+            reduces noise sensitivity compared to picking a single minimum point. You can also
+            change or select the baseline in our interactive window.
+        </p>
+
+        <h3>H<sub>2</sub>O Iteration</h3>
+        <p>
+            It&rsquo;s a chicken-and-egg problem: you need H<sub>2</sub>O to calculate the density,
+            but you also need density to measure H<sub>2</sub>O. We first assume H<sub>2</sub>O = 0,
+            calculate H<sub>2</sub>O from the spectrum, add the new value back into the composition,
+            and repeat until |new &minus; old| &lt; 0.001 wt%. This typically converges within
+            2&ndash;3 steps.
+        </p>
+
+        <h3>Uncertainty</h3>
+        <p>H<sub>2</sub>O uncertainty is propagated from two sources, combined in quadrature:</p>
+        <ol>
+            <li><strong>Thickness uncertainty</strong> &mdash; relative thickness error propagates
+                directly via Beer-Lambert.</li>
+            <li><strong>Baseline anchor variation</strong> &mdash; the low anchor region is divided
+                into overlapping sub-windows (~67 cm<sup>&minus;1</sup> wide); each produces a slightly
+                different baseline and peak height. The standard deviation of these peak heights
+                quantifies baseline uncertainty.</li>
+        </ol>
+
+        <h3>Concentration</h3>
+        <p>H<sub>2</sub>O concentration is calculated following the Beer-Lambert law.</p>
+    </section>
+
+    <!-- ====== 2.3 CO2 ====== -->
+    <section class="about-section" id="co2">
+        <h2>2.3 CO<sub>2</sub> Doublet Fitting</h2>
+
+        <div class="note">
+            <strong>Preprocessing:</strong> The input spectrum is normalized to 100 &mu;m thickness.
+            Fitted coefficients correspond to a standard path length, and concentration formulas
+            use 100 instead of the actual thickness.
+        </div>
+
+        <h3>2.3.1 Simple lstsq Model</h3>
+        <p>
+            The same fitting method as the original Excel template, using least squares to fit
+            the carbonate doublet. You can find the original Excel template in the
+            <a href="https://github.com/xinkaihe26/FTIR-Vol-cal" target="_blank">GitHub repository</a>.
+        </p>
+        <div class="formula">
+            y = offset + c<sub>bkg</sub> &times; E + c<sub>1630</sub> &times; F +
+            c<sub>CO3</sub> &times; G + c<sub>st</sub> &times; H
+        </div>
+        <ul class="param-list">
+            <li><strong>E</strong> = devolatilized glass reference spectrum (WOK162, background only)</li>
+            <li><strong>F</strong> = 1630 cm<sup>&minus;1</sup> molecular H<sub>2</sub>O peak reference</li>
+            <li><strong>G</strong> = CO<sub>3</sub><sup>2&minus;</sup> doublet reference</li>
+            <li><strong>H</strong> = linear slope correction</li>
+            <li><strong>offset</strong> = constant baseline shift</li>
+            <li><strong>c<sub>bkg</sub>, c<sub>1630</sub>, c<sub>CO3</sub>, c<sub>st</sub></strong> = fitted coefficients</li>
+        </ul>
+        <p>
+            <strong>Fitting range:</strong> 1350&ndash;1800 cm<sup>&minus;1</sup> (116 points)<br>
+            <strong>Limitation:</strong> The E background is from one specific composition (WOK162);
+            it works for similar compositions but fit quality degrades for very different compositions.
+        </p>
+
+        <h3>2.3.2 lstsq with Shifted Peak Position</h3>
+        <p>
+            The carbonate doublet peaks (~1430 and ~1515 cm<sup>&minus;1</sup>) may shift their positions
+            independently due to different cation environments (Na<sup>+</sup>, Ca<sup>2+</sup>,
+            Mg<sup>2+</sup>). The Simple lstsq model locks the doublet as a single fixed reference,
+            so it cannot capture these shifts.
+        </p>
+        <p>
+            This model replaces the fixed doublet with two independent Gaussian peaks, each with an
+            additional derivative term that allows the peak position to shift independently. The
+            background and baseline treatment remain the same as the Simple lstsq model. After
+            fitting, the independent shift of each peak is recovered from the ratio of derivative
+            to amplitude coefficients.
+        </p>
+        <p>
+            <strong>Fitting range:</strong> 1350&ndash;1800 cm<sup>&minus;1</sup><br>
+            Peak shift positions are reported for fitting quality assessment.
+        </p>
+
+        <h3>2.3.3 PCA Baseline</h3>
+        <p>
+            A single devolatilized glass reference (WOK162) is not sufficient to capture the baseline
+            shape for all compositions. Following Shi et al. (2024), we use pre-computed PCA
+            components trained on 57 devolatilized glass spectra (basalt&ndash;andesite,
+            SiO<sub>2</sub> = 43&ndash;60%) from the PyIRoGlass database (5 baseline components:
+            1 mean + 4 principal components). This provides a more flexible baseline that adapts
+            to different compositions, particularly in the 1250&ndash;1350 cm<sup>&minus;1</sup> range
+            where Si&ndash;O absorption varies significantly.
+        </p>
+        <ul>
+            <li>14 parameters solved with bounded linear least squares (unlike Shi et al. 2024,
+                which uses MCMC to fit the doublet).</li>
+            <li>Two independent Gaussians + Taylor-expanded derivative terms for independent
+                peak shift estimation.</li>
+            <li><strong>Fitting range:</strong> 1250&ndash;2200 cm<sup>&minus;1</sup> (wider range to
+                capture Si&ndash;O signals, similar to Shi et al. 2024).</li>
+        </ul>
+
+        <h3>Model Comparison</h3>
+        <table class="quality-table" style="font-size:0.88em;">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Simple lstsq</th>
+                    <th>lstsq + Shifted Peak</th>
+                    <th>PCA Baseline</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Baseline</strong></td>
+                    <td>Single reference glass (WOK162)</td>
+                    <td>Single reference glass (WOK162)</td>
+                    <td>PCA from 57 glasses (PyIRoGlass)</td>
+                </tr>
+                <tr>
+                    <td><strong>CO<sub>3</sub> peaks</strong></td>
+                    <td>Fixed doublet reference (single unit)</td>
+                    <td>2 independent Gaussians + Taylor derivatives</td>
+                    <td>2 independent Gaussians + Taylor derivatives</td>
+                </tr>
+                <tr>
+                    <td><strong>Peak shift</strong></td>
+                    <td>Not allowed (fixed position)</td>
+                    <td>Independent shift per peak</td>
+                    <td>Independent shift per peak</td>
+                </tr>
+                <tr>
+                    <td><strong>H<sub>2</sub>O 1635</strong></td>
+                    <td>Single reference (F)</td>
+                    <td>Single reference (F)</td>
+                    <td>Empirical mean + 2 PCs</td>
+                </tr>
+                <tr>
+                    <td><strong>Parameters</strong></td>
+                    <td>5</td>
+                    <td>8</td>
+                    <td>14</td>
+                </tr>
+                <tr>
+                    <td><strong>Solver</strong></td>
+                    <td>Unconstrained lstsq</td>
+                    <td>Bounded lsq_linear</td>
+                    <td>Bounded lsq_linear</td>
+                </tr>
+                <tr>
+                    <td><strong>Fitting range</strong></td>
+                    <td>1350&ndash;1800 cm<sup>&minus;1</sup></td>
+                    <td>1350&ndash;1800 cm<sup>&minus;1</sup></td>
+                    <td>1250&ndash;2200 cm<sup>&minus;1</sup></td>
+                </tr>
+                <tr>
+                    <td><strong>Best for</strong></td>
+                    <td>Compositions similar to WOK162</td>
+                    <td>Compositions similar to WOK162, with peak shifts</td>
+                    <td>Diverse compositions (basalt&ndash;andesite)</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ====== 2.4 Fringe ====== -->
+    <section class="about-section" id="fringe">
+        <h2>2.4 Fringe Correction</h2>
+        <p>
+            Interference fringes may affect carbonate doublet fitting in relatively thin wafers,
+            resulting in overestimation of CO<sub>2</sub> concentration. We include an optional
+            fringe correction to minimize the impact.
+        </p>
+        <ul>
+            <li>Periodic fringes are detected in the 2200&ndash;2800 cm<sup>&minus;1</sup> region
+                (excluding 2280&ndash;2400 cm<sup>&minus;1</sup> for atmospheric CO<sub>2</sub>).</li>
+            <li>Detection criteria: coefficient of variation of half-spacings &lt; 0.35 and
+                amplitude &gt; 0.003.</li>
+            <li>Sin/cos basis functions (fundamental + 2nd harmonic) are added to the fitting model,
+                so fringes are removed jointly with CO<sub>3</sub> fitting.</li>
+        </ul>
+        <div class="note">
+            This method may inadvertently subtract part of the carbonate signal if fringes are not
+            perfectly periodic. We recommend manually assessing fringe-corrected results for spectra
+            with strong interference fringes. You can choose &ldquo;auto&rdquo;, &ldquo;always&rdquo;, or
+            &ldquo;off&rdquo;. We recommend turning off the correction if your spectra are fringe-free.
+            Fringe correction will be updated if we find better solutions.
+        </div>
+    </section>
+
+    <!-- ====== 2.5 Quality ====== -->
+    <section class="about-section" id="quality">
+        <h2>2.5 Quality Estimation</h2>
+        <p>
+            We provide a quality flag for each CO<sub>3</sub> fit as a reference. We recommend
+            manually checking the results, especially for imperfect spectra (with fringes, host
+            contamination, or other unexpected features).
+        </p>
+        <p>Quality is estimated based on R<sup>2</sup>, peak shift, and signal-to-noise ratio (SNR):</p>
+        <table class="quality-table">
+            <thead>
+                <tr><th>Flag</th><th>Criteria</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>GOOD</strong></td><td>High R<sup>2</sup>, high SNR, low peak shift</td></tr>
+                <tr><td><strong>FAIR</strong></td><td>Intermediate R<sup>2</sup></td></tr>
+                <tr><td><strong>POOR</strong></td><td>Low R<sup>2</sup></td></tr>
+                <tr><td><strong>NEGATIVE</strong></td><td>No carbonate doublet detected (c<sub>CO3</sub> &le; 0; devolatilized glass or CO<sub>2</sub> below noise level)</td></tr>
+                <tr><td><strong>SUSPECT</strong></td><td>|peak shift| &gt; 15 cm<sup>&minus;1</sup> (likely not carbonate; may be fringes or contamination &mdash; manual check required)</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ====== 3. Output ====== -->
+    <section class="about-section" id="output">
+        <h2>3. Output</h2>
+
+        <h3>3.1 Physical Properties</h3>
+        <p>Thickness, density, and refractive index of the olivine host.</p>
+
+        <h3>3.2 H<sub>2</sub>O Peak</h3>
+        <p>
+            H<sub>2</sub>O total peak height is read at a fixed position of 3550 cm<sup>&minus;1</sup>
+            (interpolated), rather than at the maximum absorbance position. This provides consistency
+            across samples.
+        </p>
+
+        <h3>3.3 Carbonate Fit Results</h3>
+        <p>
+            Fitting model used; carbonate doublet mean absorbance and uncertainty;
+            R<sup>2</sup>; fitting quality flag; and doublet peak shift.
+        </p>
+
+        <h3>3.4 Concentrations</h3>
+        <p>
+            Calculated from the Beer-Lambert law. Currently only considers total H<sub>2</sub>O
+            (undersaturated; does not fit the 4500 and 5200 cm<sup>&minus;1</sup> water peaks).
+        </p>
+        <ul>
+            <li><strong>H<sub>2</sub>O uncertainty:</strong> from baseline anchor variation and
+                thickness uncertainty, combined in quadrature.</li>
+            <li><strong>CO<sub>2</sub> uncertainty:</strong> from (1) fitting noise (residual RMS
+                of model vs. data) and (2) shift sensitivity (variation in CO<sub>3</sub> absorbance
+                when peak position is swept &plusmn;20 cm<sup>&minus;1</sup>), combined in quadrature.</li>
+            <li><strong>CO<sub>2</sub> detection limit:</strong> 3 &times; residual RMS, converted
+                to ppm via Beer-Lambert. If SNR &lt; 3, CO<sub>2</sub> is marked as BDL
+                (below detection limit).</li>
+            <li><strong>H<sub>2</sub>O iteration:</strong> density and H<sub>2</sub>O are solved
+                iteratively (see <a href="#h2o">Section 2.2</a>).</li>
+        </ul>
+
+        <h3>3.5 Diagnostic Figures</h3>
+        <ul>
+            <li><strong>Carbonate doublet:</strong> (1) fitting results vs. sample data with
+                components; (2) carbonate doublet after baseline subtraction; (3) residuals.</li>
+            <li><strong>H<sub>2</sub>O total:</strong> (1) raw spectrum with linear baseline and
+                anchor regions; (2) peak height after baseline subtraction.</li>
+        </ul>
+
+        <h3>3.6 Interactive Window</h3>
+        <ul>
+            <li><strong>Carbonate doublet:</strong> interactive chart where you can zoom in/out
+                and download the fitting data.</li>
+            <li><strong>H<sub>2</sub>O peak:</strong> check the default fitting result, or select
+                custom points/regions for the linear baseline.</li>
+            <li><strong>Batch fitting:</strong> browse through all fitted samples via a dropdown
+                menu and inspect fitting quality before downloading.</li>
+        </ul>
+
+        <h3>3.7 Download</h3>
+        <p>
+            You can download: (1) detailed model values at each wavenumber (CSV);
+            (2) calculated concentrations; (3) all diagnostic figures.
+        </p>
+    </section>
+
+    <!-- ====== References ====== -->
+    <section class="about-section" id="references">
+        <h2>References</h2>
+        <ul>
+            <li>Shi, S., Towbin, W. H., Plank, T., Barth, A., Rasmussen, D., Moussallam, Y.,
+                Lee, H. J. and Menke, W. (2024) &ldquo;PyIRoGlass: An open-source, Bayesian MCMC
+                algorithm for fitting baselines to FTIR spectra of basaltic-andesitic glasses&rdquo;,
+                <em>Volcanica</em>, 7(2), 471&ndash;501.
+                doi:<a href="https://doi.org/10.30909/vol.07.02.471501" target="_blank">10.30909/vol.07.02.471501</a></li>
+            <li>Church, B.N. &amp; Johnson, W.M. (1980) Calculation of the refractive index of
+                silicate glasses from chemical composition. <em>GSA Bulletin</em>, 91(10),
+                619&ndash;625.</li>
+        </ul>
+    </section>
+
+    <!-- ====== Source & Contact ====== -->
+    <section class="about-section" id="source">
+        <h2>Source Code &amp; Contact</h2>
+        <p>
+            Source code:
+            <a href="https://github.com/xinkaihe26/FTIR-Vol-cal" target="_blank">github.com/xinkaihe26/FTIR-Vol-cal</a>
+        </p>
+        <p>
+            Feedback and bug reports:
+            <a href="mailto:xinkaihe@uw.edu">xinkaihe@uw.edu</a> or
+            <a href="https://github.com/xinkaihe26/FTIR-Vol-cal/issues" target="_blank">GitHub Issues</a>
+        </p>
+    </section>
+
+</div>
 </div>
 </body>
 </html>

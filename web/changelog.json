@@ -1,5 +1,14 @@
 [
      {
+        "date": "2026-03-16",
+        "items": [
+            "Update documentation for new users",
+            "Add interactive windows in both single and batch fitting to check fit quality and adjust parameters as needed",
+            "Add option to export fit results and diagnostic plots as a comprehensive report"
+            ]
+    },
+    
+    {
         "date": "2026-03-13",
         "items": [
             "Interactive CO3 fit chart (Plotly): zoomable, with Background (excl. CO3) trace and CSV download",

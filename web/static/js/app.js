@@ -208,22 +208,362 @@ async function submitBatch() {
             return;
         }
 
-        // Download ZIP
-        const blob = await resp.blob();
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "ftir_batch_results.zip";
-        link.click();
-        URL.revokeObjectURL(link.href);
+        const data = await resp.json();
+        window._batchData = data;
 
-        showStatus("Batch complete! " + batchFiles.length + " files processed. ZIP downloaded.", "loading");
+        // Show the batch viewer
+        const viewer = document.getElementById("batch-viewer-section");
+        viewer.style.display = "block";
+
+        // Hide single-sample results section
+        resultsSection.classList.remove("visible");
+
+        // Populate dropdown
+        const select = document.getElementById("batch-sample-select");
+        select.innerHTML = "";
+        const valid = data.results.filter(r => !r.error);
+        valid.forEach((r, i) => {
+            const opt = document.createElement("option");
+            opt.value = i;
+            opt.textContent = r.sample_name;
+            select.appendChild(opt);
+        });
+        window._batchValid = valid;
+
+        // Build summary table
+        buildBatchSummaryTable(valid);
+
+        // Show first sample
+        if (valid.length > 0) {
+            select.value = 0;
+            onBatchSampleChange();
+        }
+
+        const nErr = data.errors ? data.errors.length : 0;
+        const msg = "Batch complete! " + valid.length + " samples processed" +
+            (nErr > 0 ? ", " + nErr + " errors." : ".");
+        showStatus(msg, "loading");
         status.style.color = "#27ae60";
+
+        // Scroll to viewer
+        viewer.scrollIntoView({ behavior: "smooth" });
 
     } catch (e) {
         showStatus("Network error: " + e.message, "error");
     } finally {
         btn.disabled = false;
     }
+}
+
+/* -----------------------------------------------------------
+   Batch Viewer — interactive sample browser
+   ----------------------------------------------------------- */
+
+function onBatchSampleChange() {
+    const select = document.getElementById("batch-sample-select");
+    const idx = parseInt(select.value);
+    const valid = window._batchValid || [];
+    if (idx < 0 || idx >= valid.length) return;
+    const res = valid[idx];
+
+    // Counter
+    document.getElementById("batch-viewer-counter").textContent =
+        (idx + 1) + " / " + valid.length;
+
+    // Info bar
+    const co3 = res.co3_fit || {};
+    const conc = res.concentration || {};
+    const t = res.thickness || {};
+    const info = [
+        "H2O = " + (conc.total_h2o_wt_pct != null ? conc.total_h2o_wt_pct.toFixed(3) : "?") + " wt%",
+        "CO2 = " + (conc.co2_below_detection ? "BDL" :
+            (conc.co2_ppm != null ? conc.co2_ppm.toFixed(1) : "?")) + " ppm",
+        "R\u00b2 = " + (co3.r_squared != null ? co3.r_squared.toFixed(4) : "?"),
+        "Quality: " + (co3.quality_flag || "?"),
+        "Model: " + (co3.model || "?"),
+        "d = " + (t.average_um != null ? t.average_um.toFixed(1) :
+            (t.thickness_um != null ? t.thickness_um.toFixed(1) : "?")) + " \u00b5m",
+    ];
+    document.getElementById("batch-viewer-info").textContent = info.join("    ");
+
+    // Titles
+    document.getElementById("batch-co3-title").textContent = res.sample_name;
+    document.getElementById("batch-h2o-title").textContent = res.sample_name;
+
+    // Highlight active row in summary table
+    document.querySelectorAll("#batch-summary-table-wrapper tr.active-row").forEach(
+        tr => tr.classList.remove("active-row"));
+    const activeRow = document.querySelector(
+        "#batch-summary-table-wrapper tr[data-idx='" + idx + "']");
+    if (activeRow) activeRow.classList.add("active-row");
+
+    // Render charts
+    renderBatchCO3(res);
+    renderBatchH2O(res);
+}
+
+function batchViewerPrev() {
+    const select = document.getElementById("batch-sample-select");
+    const n = select.options.length;
+    if (n === 0) return;
+    select.value = (parseInt(select.value) - 1 + n) % n;
+    onBatchSampleChange();
+}
+
+function batchViewerNext() {
+    const select = document.getElementById("batch-sample-select");
+    const n = select.options.length;
+    if (n === 0) return;
+    select.value = (parseInt(select.value) + 1) % n;
+    onBatchSampleChange();
+}
+
+function renderBatchCO3(res) {
+    const co3 = res.co3_fit || {};
+    const wn = co3.wavenumber;
+    const data = co3.data;
+    const fitted = co3.fitted;
+    const bkg = co3.background;
+    const co3comp = co3.co3_component;
+    const sub = co3.co3_subtracted;
+
+    if (!wn || !data) {
+        Plotly.purge("batch-co3-chart");
+        Plotly.purge("batch-co3-sub-chart");
+        return;
+    }
+
+    // --- Chart 1: CO3 Fit ---
+    const traces = [];
+    traces.push({
+        x: wn, y: data, mode: "lines", name: "Sample data",
+        line: { color: "black", width: 1 },
+    });
+    if (fitted) {
+        traces.push({
+            x: wn, y: fitted, mode: "lines", name: "Fitted model",
+            line: { color: "red", width: 1.5 },
+        });
+    }
+    if (bkg) {
+        traces.push({
+            x: wn, y: bkg, mode: "lines", name: "Background",
+            line: { color: "green", width: 1, dash: "dot" },
+        });
+    }
+    if (co3comp) {
+        traces.push({
+            x: wn, y: co3comp, mode: "lines", name: "CO\u2083\u00b2\u207b component",
+            line: { color: "purple", width: 1, dash: "dash" },
+        });
+    }
+
+    const fr = co3.fit_range || [1350, 1800];
+    const quality = co3.quality_flag || "";
+    const r2 = co3.r_squared != null ? co3.r_squared.toFixed(4) : "?";
+
+    const layout1 = {
+        title: res.sample_name + "  |  R\u00b2=" + r2 + "  " + quality,
+        xaxis: { title: "Wavenumber (cm\u207b\u00b9)", autorange: "reversed",
+                 range: [2000, 1200] },
+        yaxis: { title: "Absorbance", rangemode: "tozero" },
+        shapes: [{
+            type: "rect", x0: fr[0], x1: fr[1], y0: 0, y1: 1,
+            xref: "x", yref: "paper",
+            fillcolor: "yellow", opacity: 0.1, line: { width: 0 },
+        }],
+        legend: { x: 0, y: 1, bgcolor: "rgba(255,255,255,0.8)", font: { size: 10 } },
+        margin: { t: 40, b: 50, l: 60, r: 60 },
+        height: 400,
+    };
+
+    Plotly.newPlot("batch-co3-chart", traces, layout1, {
+        responsive: true,
+        toImageButtonOptions: { format: "png", filename: res.sample_name + "_co3_fit" },
+    });
+
+    // --- Chart 2: CO3 Subtracted ---
+    if (sub) {
+        const subWn = [], subY = [];
+        for (let i = 0; i < wn.length; i++) {
+            if (wn[i] >= 1300 && wn[i] <= 1900) {
+                subWn.push(wn[i]);
+                subY.push(sub[i]);
+            }
+        }
+
+        const subTraces = [{
+            x: subWn, y: subY, mode: "lines",
+            name: "CO\u2083\u00b2\u207b by subtraction",
+            line: { color: "mediumpurple", width: 1 },
+            fill: "tozeroy",
+            fillcolor: "rgba(147,112,219,0.2)",
+        }];
+
+        // Annotate peaks
+        const pk1515 = co3.co3_peak_1515;
+        const pk1430 = co3.co3_peak_1430;
+        const annotations = [];
+        if (pk1515) {
+            annotations.push({
+                x: 1515, y: pk1515, text: "1515: " + pk1515.toFixed(4),
+                showarrow: true, arrowhead: 2, arrowcolor: "red",
+                bgcolor: "lightyellow", bordercolor: "gray", font: { size: 10 },
+            });
+        }
+        if (pk1430) {
+            annotations.push({
+                x: 1430, y: pk1430, text: "1430: " + pk1430.toFixed(4),
+                showarrow: true, arrowhead: 2, arrowcolor: "red",
+                bgcolor: "lightyellow", bordercolor: "gray", font: { size: 10 },
+            });
+        }
+
+        const layout2 = {
+            title: "CO\u2083\u00b2\u207b Band by Subtraction",
+            xaxis: { title: "Wavenumber (cm\u207b\u00b9)", autorange: "reversed",
+                     range: [1900, 1300] },
+            yaxis: { title: "Absorbance (subtracted)" },
+            annotations: annotations,
+            margin: { t: 40, b: 50, l: 60, r: 60 },
+            height: 350,
+        };
+
+        Plotly.newPlot("batch-co3-sub-chart", subTraces, layout2, {
+            responsive: true,
+            toImageButtonOptions: { format: "png", filename: res.sample_name + "_co3_subtracted" },
+        });
+    } else {
+        Plotly.purge("batch-co3-sub-chart");
+    }
+}
+
+function renderBatchH2O(res) {
+    const h2o = res.h2o_peak || {};
+    const wn = h2o.wavenumber;
+    const raw = h2o.raw_absorbance;
+    const bl = h2o.baseline;
+    const corr = h2o.baseline_corrected;
+
+    if (!wn || !raw) {
+        Plotly.purge("batch-h2o-chart");
+        return;
+    }
+
+    const traces = [];
+
+    traces.push({
+        x: wn, y: raw, mode: "lines", name: "Raw spectrum",
+        line: { color: "black", width: 1 },
+    });
+    if (bl) {
+        traces.push({
+            x: wn, y: bl, mode: "lines", name: "Baseline",
+            line: { color: "red", width: 1.2, dash: "dash" },
+        });
+    }
+    if (corr) {
+        traces.push({
+            x: wn, y: corr, mode: "lines", name: "Corrected",
+            line: { color: "steelblue", width: 1 },
+            yaxis: "y2", fill: "tozeroy",
+            fillcolor: "rgba(70,130,180,0.15)",
+        });
+    }
+
+    const loRange = h2o.baseline_low_range || [2200, 2400];
+    const hiRange = h2o.baseline_high_range || [3700, 3800];
+
+    const pkWn = h2o.peak_wavenumber;
+    const pkHt = h2o.peak_height;
+    const annotations = [];
+    if (pkWn != null && pkHt != null) {
+        annotations.push({
+            x: pkWn, y: pkHt, yref: "y2",
+            text: pkHt.toFixed(4) + " @ " + pkWn.toFixed(0),
+            showarrow: true, arrowhead: 2, arrowcolor: "red",
+            bgcolor: "lightyellow", bordercolor: "gray",
+            font: { size: 11 },
+        });
+    }
+
+    const layout = {
+        title: res.sample_name + "  |  Peak = " +
+            (pkHt != null ? pkHt.toFixed(4) : "?") +
+            " @ " + (pkWn != null ? pkWn.toFixed(0) : "?") + " cm\u207b\u00b9",
+        xaxis: { title: "Wavenumber (cm\u207b\u00b9)", autorange: "reversed" },
+        yaxis: { title: "Absorbance" },
+        yaxis2: { title: "Corrected", overlaying: "y", side: "right",
+                  showgrid: false },
+        shapes: [
+            { type: "rect", x0: loRange[0], x1: loRange[1], y0: 0, y1: 1,
+              xref: "x", yref: "paper",
+              fillcolor: "green", opacity: 0.1, line: { width: 0 } },
+            { type: "rect", x0: hiRange[0], x1: hiRange[1], y0: 0, y1: 1,
+              xref: "x", yref: "paper",
+              fillcolor: "orange", opacity: 0.1, line: { width: 0 } },
+        ],
+        annotations: annotations,
+        legend: { x: 0, y: 1, bgcolor: "rgba(255,255,255,0.8)", font: { size: 10 } },
+        margin: { t: 40, b: 50, l: 60, r: 60 },
+        height: 400,
+    };
+
+    const config = {
+        responsive: true,
+        toImageButtonOptions: {
+            format: "png", filename: res.sample_name + "_h2o_baseline",
+        },
+    };
+
+    Plotly.newPlot("batch-h2o-chart", traces, layout, config);
+}
+
+function buildBatchSummaryTable(valid) {
+    const wrapper = document.getElementById("batch-summary-table-wrapper");
+    if (!valid || valid.length === 0) { wrapper.innerHTML = ""; return; }
+
+    let html = '<table class="result-table" style="font-size:12px; white-space:nowrap;">';
+    html += '<thead><tr>' +
+        '<th>Sample</th><th>d (\u00b5m)</th>' +
+        '<th>H\u2082O (wt%)</th><th>H\u2082O unc</th>' +
+        '<th>CO\u2082 (ppm)</th><th>CO\u2082 unc</th>' +
+        '<th>R\u00b2</th><th>Quality</th><th>Model</th>' +
+        '</tr></thead><tbody>';
+
+    valid.forEach((r, i) => {
+        const c = r.concentration || {};
+        const co3 = r.co3_fit || {};
+        const t = r.thickness || {};
+        const d_val = t.average_um != null ? t.average_um : t.thickness_um;
+        const co2_val = c.co2_below_detection ? "BDL" :
+            (c.co2_ppm != null ? c.co2_ppm.toFixed(1) : "");
+        html += '<tr data-idx="' + i + '" onclick="document.getElementById(\'batch-sample-select\').value=' + i + '; onBatchSampleChange();" style="cursor:pointer;">' +
+            '<td>' + r.sample_name + '</td>' +
+            '<td>' + (d_val != null ? d_val.toFixed(1) : "") + '</td>' +
+            '<td>' + (c.total_h2o_wt_pct != null ? c.total_h2o_wt_pct.toFixed(3) : "") + '</td>' +
+            '<td>' + (c.total_h2o_unc_wt_pct != null ? c.total_h2o_unc_wt_pct.toFixed(3) : "") + '</td>' +
+            '<td>' + co2_val + '</td>' +
+            '<td>' + (c.co2_unc_ppm != null ? c.co2_unc_ppm.toFixed(1) : "") + '</td>' +
+            '<td>' + (co3.r_squared != null ? co3.r_squared.toFixed(4) : "") + '</td>' +
+            '<td>' + (co3.quality_flag || "") + '</td>' +
+            '<td>' + (co3.model || "") + '</td>' +
+            '</tr>';
+    });
+
+    html += '</tbody></table>';
+    wrapper.innerHTML = html;
+}
+
+function downloadBatchCSV() {
+    const data = window._batchData;
+    if (!data || !data.summary_csv) return;
+    const blob = new Blob([data.summary_csv], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "ftir_batch_results.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
 }
 
 /* -----------------------------------------------------------
