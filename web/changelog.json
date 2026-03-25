@@ -1,4 +1,13 @@
 [
+   {
+        "date": "2026-03-23",
+        "items": [
+            "Allow multiple reflectance spectra to be uploaded, and calculate average thicknesses",
+            "Allow H2O concentrtion to change according to baseline selection at interactive plot",
+            "Fix the issue of selected maxima and minima points at reflectance plots, and correct for thickness calculation"
+            ]
+    },
+
      {
         "date": "2026-03-16",
         "items": [

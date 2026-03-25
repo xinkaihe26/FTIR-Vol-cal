@@ -22,7 +22,9 @@ import matplotlib
 matplotlib.use("Agg")
 
 from flask import Flask, render_template, request, jsonify
-from ftir_tools import process_sample
+from ftir_tools import (
+    process_sample, calculate_thickness_from_spectrum, olivine_refractive_index,
+)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB
@@ -115,11 +117,15 @@ def run_analysis():
         trans_path = Path(tmp_dir) / "transmission.txt"
         trans_file.save(str(trans_path))
 
-        ref_path = None
-        ref_file = request.files.get("reflectance_file")
-        if ref_file and ref_file.filename != "":
-            ref_path = Path(tmp_dir) / "reflectance.txt"
-            ref_file.save(str(ref_path))
+        ref_paths = []
+        ref_original_names = []
+        ref_files = request.files.getlist("reflectance_file")
+        for i, rf in enumerate(ref_files):
+            if rf and rf.filename != "":
+                rp = Path(tmp_dir) / f"reflectance_{i}.txt"
+                rf.save(str(rp))
+                ref_paths.append(rp)
+                ref_original_names.append(rf.filename)
 
         # --- Parse composition ---
         comp_str = request.form.get("composition", "{}")
@@ -158,16 +164,57 @@ def run_analysis():
             except ValueError:
                 return jsonify({"error": "Invalid thickness value."}), 400
         elif mode == "C":
-            if not ref_path:
+            if not ref_paths:
                 return jsonify({
-                    "error": "Mode C requires a reflectance spectrum file."
+                    "error": "Mode C requires at least one reflectance "
+                             "spectrum file."
                 }), 400
             try:
-                kwargs["reflectance_csv"] = str(ref_path)
-                kwargs["olivine_fo"] = float(
-                    request.form.get("olivine_fo", 85))
+                fo = float(request.form.get("olivine_fo", 85))
             except ValueError:
                 return jsonify({"error": "Invalid olivine Fo value."}), 400
+
+            if len(ref_paths) == 1:
+                # Single reflectance file — standard Mode C
+                kwargs["reflectance_csv"] = str(ref_paths[0])
+                kwargs["olivine_fo"] = fo
+            else:
+                # Multiple reflectance files — compute each, average,
+                # then pass as Mode B with combined uncertainty
+                import math
+                n_ref = olivine_refractive_index(fo)
+                per_spec = []  # (thickness_um, stdev_um) per spectrum
+                for rp in ref_paths:
+                    tres = calculate_thickness_from_spectrum(
+                        str(rp), refractive_index=n_ref,
+                        save_figure=False)
+                    per_spec.append((tres["average_um"], tres["stdev_um"]))
+
+                thicknesses = [t for t, _ in per_spec]
+                mean_t = sum(thicknesses) / len(thicknesses)
+
+                # Uncertainty: combine between-spectrum scatter with
+                # within-spectrum uncertainties propagated to the mean
+                n = len(thicknesses)
+                s_between = (
+                    math.sqrt(sum((t - mean_t) ** 2 for t in thicknesses)
+                              / (n - 1))
+                    if n >= 2 else 0.0
+                )
+                s_within = (
+                    math.sqrt(sum(u ** 2 for _, u in per_spec)) / n
+                )
+                combined_unc = math.sqrt(s_between ** 2 + s_within ** 2)
+
+                kwargs["thickness_um"] = mean_t
+                kwargs["thickness_unc_um"] = combined_unc
+                # Store per-spectrum details for the response
+                kwargs["_multi_ref_details"] = [
+                    {"filename": ref_original_names[i],
+                     "thickness_um": per_spec[i][0],
+                     "stdev_um": per_spec[i][1]}
+                    for i in range(n)
+                ]
         else:
             return jsonify({"error": f"Unknown thickness mode: {mode}"}), 400
 
@@ -192,6 +239,7 @@ def run_analysis():
                     kwargs[key] = float(val)
 
         # --- Run analysis ---
+        multi_ref_details = kwargs.pop("_multi_ref_details", None)
         result = process_sample(**kwargs)
 
         # --- Build response ---
@@ -204,6 +252,9 @@ def run_analysis():
             "co3_fit": _clean_dict(result.get("co3_fit", {})),
             "concentration": _clean_dict(result.get("concentration", {})),
         }
+        if multi_ref_details is not None:
+            resp["thickness"]["multi_reflectance"] = multi_ref_details
+            resp["thickness"]["method"] = "multi_reflectance_avg"
         if "epsilon" in result:
             resp["epsilon"] = _clean_dict(result["epsilon"])
 

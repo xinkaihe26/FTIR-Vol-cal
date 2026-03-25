@@ -665,8 +665,10 @@ async function submitAnalysis() {
     const fd = new FormData();
     fd.append("transmission_file", transFile);
 
-    const refFile = document.getElementById("reflectance_file").files[0];
-    if (refFile) fd.append("reflectance_file", refFile);
+    const refFiles = document.getElementById("reflectance_file").files;
+    for (let i = 0; i < refFiles.length; i++) {
+        fd.append("reflectance_file", refFiles[i]);
+    }
 
     // Composition
     const comp = {};
@@ -804,6 +806,15 @@ function buildPhysicalRows(data) {
     if (t.method) rows.push(["Method", t.method]);
     if (t.n_maxima_used !== undefined) {
         rows.push(["Fringes used", t.n_maxima_used + " maxima, " + t.n_minima_used + " minima"]);
+    }
+    // Multi-reflectance details
+    if (t.multi_reflectance) {
+        const specs = t.multi_reflectance;
+        for (let i = 0; i < specs.length; i++) {
+            const s = specs[i];
+            rows.push(["  Spectrum " + (i + 1) + " (" + s.filename + ")",
+                fmt(s.thickness_um, 2) + " +/- " + fmt(s.stdev_um, 2) + " um"]);
+        }
     }
 
     const d = data.density || {};
@@ -1289,8 +1300,14 @@ function renderH2OInteractive(data) {
     }
     card.style.display = "block";
 
-    // Store spectrum data for recalculation
-    window._h2oData = { wn, raw, sampleName: data.sample_name || "" };
+    // Store spectrum data + original results for recalculation
+    const conc = data.concentration || {};
+    window._h2oData = {
+        wn, raw, sampleName: data.sample_name || "",
+        originalPeakHeight: h.peak_height || h.peak_absorbance,
+        originalH2O: conc.total_h2o_wt_pct,
+        originalH2OUnc: conc.total_h2o_unc_wt_pct,
+    };
     window._h2oClickNext = "low"; // which anchor the next click sets
 
     // Set anchor input values from backend defaults
@@ -1313,9 +1330,14 @@ function renderH2OInteractive(data) {
     _h2oPlotWithAnchors(wn, raw, h.baseline, h.baseline_corrected,
                         h.peak_height, h.peak_wavenumber || 3550,
                         lowRange, highRange, null, data.sample_name || "");
-    document.getElementById("h2o-peak-display").textContent =
-        "Peak height: " + (h.peak_height !== undefined ? h.peak_height.toFixed(5) : "--") +
+    let initText = "Peak height: " + (h.peak_height !== undefined ? h.peak_height.toFixed(5) : "--") +
         " @ " + (h.peak_wavenumber || 3550).toFixed(0) + " cm-1";
+    if (conc.total_h2o_wt_pct !== undefined) {
+        initText += "  |  H2O: " + conc.total_h2o_wt_pct.toFixed(4) + " wt%";
+        if (conc.total_h2o_unc_wt_pct !== undefined)
+            initText += " +/- " + conc.total_h2o_unc_wt_pct.toFixed(4);
+    }
+    document.getElementById("h2o-peak-display").textContent = initText;
 }
 
 // anchorPts: null for range mode, or [{wn, ab}, {wn, ab}] for point mode
@@ -1463,12 +1485,50 @@ function _h2oApplyBaseline(loWn, loAb, hiWn, hiAb, anchorPts, lowRange, highRang
     const peakWn = 3550.0;
     const peakHeight = _interpAt(wn, corrected, peakWn);
 
-    document.getElementById("h2o-peak-display").textContent =
-        "Peak height: " + peakHeight.toFixed(5) + " @ " + peakWn.toFixed(0) + " cm-1";
+    // Update peak height display
+    let peakText = "Peak height: " + peakHeight.toFixed(5) + " @ " + peakWn.toFixed(0) + " cm-1";
+
+    // Recalculate H2O wt% by proportional scaling from original result
+    const origPeak = window._h2oData.originalPeakHeight;
+    const origH2O = window._h2oData.originalH2O;
+    if (origPeak && origPeak > 0 && origH2O !== undefined && origH2O !== null) {
+        const scale = peakHeight / origPeak;
+        const newH2O = origH2O * scale;
+        peakText += "  |  H2O: " + newH2O.toFixed(4) + " wt%";
+        const origUnc = window._h2oData.originalH2OUnc;
+        if (origUnc !== undefined && origUnc !== null) {
+            const newUnc = origUnc * scale;
+            peakText += " +/- " + newUnc.toFixed(4);
+        }
+
+        // Also update the concentration table
+        _updateConcH2O(newH2O, origUnc !== undefined ? origUnc * scale : null);
+    }
+
+    document.getElementById("h2o-peak-display").textContent = peakText;
     document.getElementById("h2o-anchor-status").textContent = "";
 
     _h2oPlotWithAnchors(wn, raw, baseline, corrected, peakHeight, peakWn,
                         lowRange, highRange, anchorPts, sampleName);
+}
+
+// Update the Total H2O row in the concentration table
+function _updateConcH2O(newH2O, newUnc) {
+    const tbody = document.querySelector("#table-conc tbody");
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll("tr");
+    for (const row of rows) {
+        const th = row.querySelector("th");
+        if (th && th.textContent.trim() === "Total H2O") {
+            const td = row.querySelector("td");
+            if (td) {
+                let s = newH2O.toFixed(4) + " wt%";
+                if (newUnc !== null && newUnc !== undefined) s += " +/- " + newUnc.toFixed(4);
+                td.textContent = s;
+            }
+            break;
+        }
+    }
 }
 
 // --- Range mode recalculation ---

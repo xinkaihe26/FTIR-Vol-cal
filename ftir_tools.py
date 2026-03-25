@@ -159,12 +159,18 @@ def calculate_thickness_multi(
 
 
 def _best_fringe_run(extrema_wn: np.ndarray, n_refr: float,
-                     tol: float = 0.20) -> Tuple[int, int]:
-    """Find the longest consecutive run of consistent fringe intervals.
+                     tol: float = 0.25,
+                     half_fringe: bool = False) -> Tuple[int, int]:
+    """Find the best consecutive run of consistent fringe intervals.
 
     For each pair of adjacent extrema, compute per-interval thickness.
-    Then find the longest consecutive sub-sequence where every value is
-    within *tol* (relative) of the sub-sequence median.
+    Then find the consecutive sub-sequence that maximises the score
+    ``n_intervals * wavenumber_span``, subject to all interval thicknesses
+    being within *tol* (relative) of the sub-sequence median.
+
+    Using span-weighted scoring (instead of just longest run) prefers
+    sub-regions that cover a wider wavenumber range, which gives more
+    accurate thickness estimates.
 
     Parameters
     ----------
@@ -173,7 +179,10 @@ def _best_fringe_run(extrema_wn: np.ndarray, n_refr: float,
     n_refr : float
         Refractive index.
     tol : float
-        Relative tolerance (default 0.20 = 20%).
+        Relative tolerance (default 0.25 = 25%).
+    half_fringe : bool
+        If True, intervals are half-fringe spacings (alternating max/min)
+        and the denominator uses 4*n instead of 2*n.  Default False.
 
     Returns
     -------
@@ -185,20 +194,23 @@ def _best_fringe_run(extrema_wn: np.ndarray, n_refr: float,
     if n_pts < 3:
         return (0, n_pts - 1)
 
+    denom = 4.0 if half_fringe else 2.0
+
     # Per-interval thicknesses
     t_intervals = []
     for i in range(n_pts - 1):
         dv = abs(extrema_wn[i + 1] - extrema_wn[i])
         if dv > 0:
-            t_intervals.append(1.0 / (2.0 * n_refr * dv) * 10000.0)
+            t_intervals.append(1.0 / (denom * n_refr * dv) * 10000.0)
         else:
             t_intervals.append(np.inf)
 
-    # Find longest consecutive run where all values are within tol of
-    # the run's median.  Use expanding-window approach:
-    # for each start, extend end as far as possible.
-    best_start, best_end = 0, 1  # at least 2 extrema = 1 interval
+    # Find best consecutive run using span-weighted scoring:
+    # score = n_intervals * wavenumber_span
+    # This prefers runs that cover wider spectral range (more accurate).
+    best_start = 0
     best_len = 1
+    best_score = abs(extrema_wn[1] - extrema_wn[0])  # 1 interval
 
     for s in range(len(t_intervals)):
         for e in range(s + 1, len(t_intervals) + 1):
@@ -207,16 +219,73 @@ def _best_fringe_run(extrema_wn: np.ndarray, n_refr: float,
             if med == 0 or med == np.inf:
                 break
             if all(abs(v - med) / med <= tol for v in run):
-                if e - s > best_len:
-                    best_len = e - s
+                n_int = e - s
+                span = abs(extrema_wn[s + n_int] - extrema_wn[s])
+                score = n_int * span
+                if score > best_score:
+                    best_score = score
                     best_start = s
-                    best_end = s + e - s  # = e
+                    best_len = n_int
             else:
                 break  # further extension will only get worse
 
     # Convert interval indices back to extrema indices
-    # intervals [best_start, best_end) use extrema [best_start, best_end]
+    # intervals [best_start, best_start+best_len) use extrema
+    # [best_start, best_start+best_len]
     return (best_start, best_start + best_len)
+
+
+def _merge_alternating_extrema(maxima_wn, maxima_ref, minima_wn, minima_ref):
+    """Merge maxima and minima into a single alternating sequence.
+
+    Sorts all extrema by wavenumber and enforces strict alternation.
+    When consecutive same-type extrema occur, keeps the more prominent
+    one (higher reflectance for maxima, lower for minima).
+
+    Parameters
+    ----------
+    maxima_wn : array
+        Wavenumber positions of detected maxima.
+    maxima_ref : array
+        Reflectance values at maxima (for prominence comparison).
+    minima_wn : array
+        Wavenumber positions of detected minima.
+    minima_ref : array
+        Reflectance values at minima.
+
+    Returns
+    -------
+    merged_wn : ndarray
+        Wavenumber positions of alternating extrema (sorted ascending).
+    merged_is_max : ndarray of bool
+        True for maxima, False for minima.
+    """
+    entries = []
+    for wn_val, ref_val in zip(maxima_wn, maxima_ref):
+        entries.append((float(wn_val), True, float(ref_val)))
+    for wn_val, ref_val in zip(minima_wn, minima_ref):
+        entries.append((float(wn_val), False, float(ref_val)))
+
+    entries.sort(key=lambda x: x[0])
+
+    # Enforce alternation: when two consecutive same-type appear,
+    # keep the more prominent one
+    alt = []
+    for e in entries:
+        if not alt or alt[-1][1] != e[1]:
+            alt.append(e)
+        else:
+            prev = alt[-1]
+            if e[1]:  # maxima: keep higher reflectance
+                if e[2] > prev[2]:
+                    alt[-1] = e
+            else:     # minima: keep lower reflectance
+                if e[2] < prev[2]:
+                    alt[-1] = e
+
+    merged_wn = np.array([a[0] for a in alt])
+    merged_is_max = np.array([a[1] for a in alt])
+    return merged_wn, merged_is_max
 
 
 def calculate_thickness_from_spectrum(
@@ -331,43 +400,57 @@ def calculate_thickness_from_spectrum(
     n_max = len(maxima_wn)
     n_min = len(minima_wn)
 
-    # --- Select best sub-region for maxima and minima independently ---
-    t_max = None
-    best_max_wn = np.array([])
-    n_max_used = 0
-    if n_max >= 2:
-        s, e = _best_fringe_run(maxima_wn, refractive_index, tol=consistency_tol)
-        best_max_wn = maxima_wn[s:e + 1]
-        n_max_used = len(best_max_wn)
-        if n_max_used >= 2:
-            N_int = n_max_used - 1
-            dnu = abs(best_max_wn[-1] - best_max_wn[0])
-            if dnu > 0:
-                t_max = N_int / (2.0 * refractive_index * dnu) * 10000.0
-
-    t_min = None
-    best_min_wn = np.array([])
-    n_min_used = 0
-    if n_min >= 2:
-        s, e = _best_fringe_run(minima_wn, refractive_index, tol=consistency_tol)
-        best_min_wn = minima_wn[s:e + 1]
-        n_min_used = len(best_min_wn)
-        if n_min_used >= 2:
-            N_int = n_min_used - 1
-            dnu = abs(best_min_wn[-1] - best_min_wn[0])
-            if dnu > 0:
-                t_min = N_int / (2.0 * refractive_index * dnu) * 10000.0
-
-    # Combine results
-    thicknesses = [t for t in [t_max, t_min] if t is not None]
-    if not thicknesses:
+    # --- Merge extrema into alternating sequence for region selection ---
+    # The merged sequence ensures maxima and minima are from the same
+    # fringe region (prevents misalignment).  Thickness is then calculated
+    # from same-type extrema (2*n*dv formula) within the selected region.
+    if n_max + n_min < 3:
         raise ValueError(
             f"Could not detect enough fringes: {n_max} maxima, {n_min} minima. "
             "Try adjusting wn_range, sg_window, or min_prominence.")
 
+    merged_wn, merged_is_max = _merge_alternating_extrema(
+        maxima_wn, ref_smooth[peaks_idx],
+        minima_wn, ref_smooth[troughs_idx])
+
+    if len(merged_wn) < 3:
+        raise ValueError(
+            f"Could not form alternating sequence: {n_max} maxima, "
+            f"{n_min} minima ({len(merged_wn)} after merge). "
+            "Try adjusting wn_range, sg_window, or min_prominence.")
+
+    # Use merged sequence only to identify the best wavenumber region
+    s, e = _best_fringe_run(merged_wn, refractive_index,
+                            tol=consistency_tol, half_fringe=True)
+    best_wn = merged_wn[s:e + 1]
+    best_is_max = merged_is_max[s:e + 1]
+    best_max_wn = best_wn[best_is_max]
+    best_min_wn = best_wn[~best_is_max]
+    n_max_used = len(best_max_wn)
+    n_min_used = len(best_min_wn)
+
+    # --- Thickness from same-type extrema within selected region ---
+    t_max = None
+    if n_max_used >= 2:
+        dnu_max = abs(best_max_wn[-1] - best_max_wn[0])
+        if dnu_max > 0:
+            t_max = (n_max_used - 1) / (2.0 * refractive_index * dnu_max) * 10000.0
+    t_min = None
+    if n_min_used >= 2:
+        dnu_min = abs(best_min_wn[-1] - best_min_wn[0])
+        if dnu_min > 0:
+            t_min = (n_min_used - 1) / (2.0 * refractive_index * dnu_min) * 10000.0
+
+    thicknesses = [t for t in [t_max, t_min] if t is not None]
+    if not thicknesses:
+        raise ValueError(
+            f"Could not calculate thickness from selected region: "
+            f"{n_max_used} maxima, {n_min_used} minima used. "
+            "Try adjusting wn_range, sg_window, or min_prominence.")
+
     avg_um = statistics.mean(thicknesses)
 
-    # Uncertainty from per-interval thicknesses within selected sub-regions
+    # Uncertainty from per-interval thicknesses (same-type, full fringe)
     per_interval = []
     if n_max_used >= 3:
         for i in range(n_max_used - 1):
